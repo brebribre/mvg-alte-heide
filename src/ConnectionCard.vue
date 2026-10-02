@@ -9,13 +9,41 @@ const props = defineProps({
   now: { type: Number, required: true },
   display: { type: Boolean, default: false },
 })
-const emit = defineEmits(['swap', 'remove', 'toggle-mode', 'add-stop', 'remove-stop'])
+const emit = defineEmits(['swap', 'remove', 'toggle-mode', 'add-stop', 'remove-stop', 'move-stop'])
 
 // Origin, via stops and destination as typed in the URL, and once resolved.
 const stopNames = computed(() => [props.connection.from, ...props.connection.legs.map((l) => l.to)])
 const stations = ref([])
 const stopLabel = (i) => stations.value[i]?.name ?? stopNames.value[i]
 const lastStop = computed(() => stopNames.value.length - 1)
+
+// Drag a stop by its handle to reorder the sequence (mouse or touch).
+const fieldsEl = ref(null)
+const drag = ref(null) // { from, over } while dragging
+
+function dragStart(i, event) {
+  event.preventDefault()
+  drag.value = { from: i, over: i }
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId)
+  } catch {
+    // No capture available; move events still reach the handle while over it.
+  }
+}
+
+function dragMove(event) {
+  if (!drag.value) return
+  const rows = [...fieldsEl.value.children]
+  const over = rows.findIndex((row) => event.clientY < row.getBoundingClientRect().bottom)
+  drag.value.over = over < 0 ? rows.length - 1 : over
+}
+
+function dragEnd(commit) {
+  if (!drag.value) return
+  const { from, over } = drag.value
+  drag.value = null
+  if (commit && from !== over) emit('move-stop', { from, to: over })
+}
 
 const newStop = ref('')
 const addingStop = ref(false)
@@ -129,9 +157,25 @@ onUnmounted(() => clearInterval(timer))
         <span class="dots"></span>
         <svg class="pin" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" /></svg>
       </div>
-      <div class="fields">
-        <div v-for="(_, i) in stopNames" :key="i" class="field" :class="{ via: i > 0 && i < lastStop }">
-          <span>{{ stopLabel(i) }}</span>
+      <div ref="fieldsEl" class="fields">
+        <div
+          v-for="(_, i) in stopNames"
+          :key="i"
+          class="field"
+          :class="{ via: i > 0 && i < lastStop, dragging: drag?.from === i, over: drag && drag.over === i && drag.from !== i }"
+        >
+          <span
+            class="handle"
+            title="Drag to reorder"
+            aria-hidden="true"
+            @pointerdown="dragStart(i, $event)"
+            @pointermove="dragMove"
+            @pointerup="dragEnd(true)"
+            @pointercancel="dragEnd(false)"
+          >
+            <svg viewBox="0 0 24 24"><path d="M9 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM9 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-6 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" /></svg>
+          </span>
+          <span class="name">{{ stopLabel(i) }}</span>
           <button
             v-if="i > 0 && i < lastStop"
             type="button"

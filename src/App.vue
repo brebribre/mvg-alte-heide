@@ -54,6 +54,14 @@ function toggleMode(c, { leg, mode }) {
   l.modes = l.modes.includes(mode) ? l.modes.filter((m) => m !== mode) : [...l.modes, mode]
 }
 
+// Only the stops move; each leg keeps its transport filter.
+function moveStop(c, { from, to }) {
+  const stops = [c.from, ...c.legs.map((l) => l.to)]
+  stops.splice(to, 0, ...stops.splice(from, 1))
+  c.from = stops[0]
+  c.legs.forEach((l, i) => (l.to = stops[i + 1]))
+}
+
 // Via stops go in just before the destination.
 function addStop(c, name) {
   c.legs.splice(c.legs.length - 1, 0, { to: name, modes: [] })
@@ -113,6 +121,7 @@ onUnmounted(() => clearInterval(ticker))
       @toggle-mode="toggleMode(c, $event)"
       @add-stop="addStop(c, $event)"
       @remove-stop="c.legs.splice($event, 1)"
+      @move-stop="moveStop(c, $event)"
     />
 
     <form class="card add" @submit.prevent="add">

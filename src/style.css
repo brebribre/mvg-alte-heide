@@ -211,9 +211,43 @@ div.field {
   gap: 4px;
 }
 
-div.field > span {
+div.field {
+  padding-left: 4px;
+}
+
+div.field .name {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.handle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+  color: var(--faint);
+  cursor: grab;
+  touch-action: none;
+}
+
+.handle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.field.dragging {
+  opacity: 0.5;
+}
+
+.field.dragging .handle {
+  cursor: grabbing;
+}
+
+.field.over {
+  border-color: var(--blue);
+  background: var(--blue-soft);
 }
 
 .icon.small {
