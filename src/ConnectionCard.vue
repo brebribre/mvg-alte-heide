@@ -82,6 +82,9 @@ const updatedAt = ref(null)
 // On the TV board the text size follows the card width (capped so it stays
 // readable from a distance) and as many rows are shown as fit the card height.
 const ROW_HEIGHT_EM = 5.8
+// Wide cards (one connection per row) put each departure on a single line.
+const WIDE_ROW_HEIGHT_EM = 2.7
+const WIDE_MIN_WIDTH_EM = 48
 const MIN_BOARD_ROWS = 3
 const MAX_BOARD_ROWS = 8
 const MIN_BOARD_FONT = 12
@@ -89,7 +92,7 @@ const MIN_BOARD_FONT = 12
 const cardEl = ref(null)
 const titleEl = ref(null)
 const titleTextEl = ref(null)
-const board = ref({ font: 26, title: 31, rows: 3 })
+const board = ref({ font: 26, title: 31, rows: 3, wide: false })
 const TITLE_SCALE = 1.2
 const TITLE_PADDING_EM = 1.8 // left + right padding of .title
 
@@ -98,11 +101,13 @@ function fitBoard() {
   if (!card) return
   const space = card.clientHeight - (titleEl.value?.offsetHeight ?? 0)
   let font = Math.min(card.clientWidth * 0.046, Math.max(26, window.innerHeight * 0.024))
-  let rows = Math.floor(space / (font * ROW_HEIGHT_EM))
+  const wide = card.clientWidth / font >= WIDE_MIN_WIDTH_EM
+  const rowEm = wide ? WIDE_ROW_HEIGHT_EM : ROW_HEIGHT_EM
+  let rows = Math.floor(space / (font * rowEm))
   // Short cards (many connections on screen) shrink the text rather than drop below a few rows.
   if (rows < MIN_BOARD_ROWS) {
-    font = Math.max(MIN_BOARD_FONT, space / (MIN_BOARD_ROWS * ROW_HEIGHT_EM))
-    rows = Math.round(space / (font * ROW_HEIGHT_EM))
+    font = Math.max(MIN_BOARD_FONT, space / (MIN_BOARD_ROWS * rowEm))
+    rows = Math.round(space / (font * rowEm))
   }
   rows = Math.min(MAX_BOARD_ROWS, Math.max(1, rows))
 
@@ -114,7 +119,7 @@ function fitBoard() {
     title = Math.min(title, card.clientWidth / (emWidth + TITLE_PADDING_EM))
   }
   title = Math.round(title * 10) / 10
-  const next = { font, title, rows }
+  const next = { font, title, rows, wide }
   if (Object.keys(next).some((k) => next[k] !== board.value[k])) board.value = next
 }
 
@@ -213,7 +218,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section ref="cardEl" class="card" :style="boardStyle">
+  <section ref="cardEl" class="card" :class="{ wide: display && board.wide }" :style="boardStyle">
     <h2 v-if="display" ref="titleEl" class="title">
       <span ref="titleTextEl" class="title-text">
         {{ stopLabel(0) }}

@@ -549,8 +549,9 @@ html.display body {
   gap: 1.5vmin;
 }
 
+/* The automatic layout turns on its side in portrait; a chosen `cols` is kept. */
 @media (orientation: portrait) {
-  .board-grid {
+  .board:not(.fixed-cols) .board-grid {
     grid-template-columns: repeat(var(--rows), minmax(0, 1fr));
     grid-template-rows: repeat(var(--cols), minmax(0, 1fr));
   }
@@ -703,4 +704,42 @@ html.display body {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.segmented {
+  flex: none;
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.segmented button {
+  min-width: 44px;
+  padding: 5px 12px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button.active {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+/* Wide board cards: one line per departure */
+.board .card.wide .routes li {
+  grid-template-columns: 10em minmax(9em, auto) minmax(0, 1fr) 4.5em 7em;
+  grid-template-areas: 'span legs detail duration countdown';
+}
+
+.board .card.wide .span,
+.board .card.wide .countdown {
+  font-size: 1.3em;
 }

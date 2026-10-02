@@ -41,6 +41,8 @@ Without parameters the page shows buses from Gertrud-Grunow-Straße to Alte Heid
 
 Add `&display=1` to the URL, or use the **Copy display link** button, to get a read-only board: the stop inputs, filters and add form are hidden, and each connection shows as many upcoming departures as fit the screen (more on larger resolutions, up to eight) in large text, without scrolling. Remove `display=1` to edit again.
 
+By default the board decides how many connections go side by side. Add `&cols=1` or `&cols=2` (or pick it under **Connections per row on the TV** before copying the link) to force one or two per row. With one per row, each departure is laid out on a single line across the full width.
+
 ## Run
 
 ```bash

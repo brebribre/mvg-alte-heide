@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConnectionCard from './ConnectionCard.vue'
 import { resolveStation } from './api'
-import { displayUrl, isDisplay, readConnections, writeConnections } from './url'
+import { displayUrl, isDisplay, readCols, readConnections, writeConnections } from './url'
 
 const connections = ref(readConnections())
 const now = ref(Date.now())
@@ -10,9 +10,21 @@ const display = isDisplay()
 const copied = ref(false)
 const copyError = ref('')
 
-// Landscape grid for the display board: one row up to 3 cards, then two, then three.
-const gridRows = computed(() => (connections.value.length <= 3 ? 1 : connections.value.length <= 8 ? 2 : 3))
-const gridCols = computed(() => Math.ceil(connections.value.length / gridRows.value))
+// Connections per row on the display board: 1, 2, or null to let the board decide
+// (one row up to 3 cards, then two, then three).
+const cols = ref(readCols())
+const COLS_OPTIONS = [
+  { value: null, label: 'Auto' },
+  { value: 1, label: '1' },
+  { value: 2, label: '2' },
+]
+
+const gridCols = computed(() => {
+  const n = connections.value.length
+  if (cols.value) return Math.min(cols.value, n)
+  return Math.ceil(n / (n <= 3 ? 1 : n <= 8 ? 2 : 3))
+})
+const gridRows = computed(() => Math.ceil(connections.value.length / gridCols.value))
 
 const clock = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
 
@@ -20,7 +32,7 @@ async function copyDisplayLink() {
   copyError.value = ''
   let url
   try {
-    url = await displayUrl(connections.value)
+    url = await displayUrl(connections.value, cols.value)
   } catch (e) {
     copyError.value = e.message
     return
@@ -40,7 +52,7 @@ const to = ref('')
 const adding = ref(false)
 const addError = ref('')
 
-watch(connections, writeConnections, { deep: true })
+watch([connections, cols], () => writeConnections(connections.value, cols.value), { deep: true })
 
 function swap(c) {
   const stops = [c.from, ...c.legs.map((l) => l.to)].reverse()
@@ -92,7 +104,7 @@ onUnmounted(() => clearInterval(ticker))
 </script>
 
 <template>
-  <main v-if="display" class="board" :style="{ '--cols': gridCols, '--rows': gridRows }">
+  <main v-if="display" class="board" :class="{ 'fixed-cols': cols }" :style="{ '--cols': gridCols, '--rows': gridRows }">
     <header class="board-bar">
       <span>Departures</span>
       <span class="clock">{{ clock.format(now) }}</span>
@@ -108,6 +120,21 @@ onUnmounted(() => clearInterval(ticker))
       <button type="button" class="primary" :disabled="!connections.length" @click="copyDisplayLink">
         {{ copied ? 'Copied' : 'Copy display link' }}
       </button>
+    </div>
+    <div class="toolbar">
+      <span class="hint">Connections per row on the TV</span>
+      <div class="segmented" role="group" aria-label="Connections per row on the TV">
+        <button
+          v-for="option in COLS_OPTIONS"
+          :key="option.label"
+          type="button"
+          :class="{ active: cols === option.value }"
+          :aria-pressed="cols === option.value"
+          @click="cols = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
     </div>
     <p v-if="copyError" class="notice bad card">{{ copyError }}</p>
 

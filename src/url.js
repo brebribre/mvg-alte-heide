@@ -4,6 +4,7 @@
 //   ?c=<from>~bus,tram@<to>                    only these modes
 //   ?c=<from>~bus@<via>~ubahn@<via>~sbahn@<to> fixed route through via stops
 //   &display=1                                 read-only fullscreen board
+//   &cols=1|2                                  connections per row on the board
 // Stops are station names, MVG global IDs (de:09162:530), `here` for the
 // device's current location, or fixed coordinates (48.18372,11.59668).
 // The older form ?c=<from>~<to>~bus,tram is still read.
@@ -59,8 +60,17 @@ function toQuery(connections) {
     .join('&')
 }
 
-export function writeConnections(connections) {
-  const query = toQuery(connections)
+// `cols=1|2` fixes how many connections sit side by side on the board;
+// without it the board picks a layout itself.
+export function readCols() {
+  const cols = Number(new URLSearchParams(location.search).get('cols'))
+  return cols === 1 || cols === 2 ? cols : null
+}
+
+const colsQuery = (cols) => (cols ? `&cols=${cols}` : '')
+
+export function writeConnections(connections, cols) {
+  const query = toQuery(connections) + (connections.length ? colsQuery(cols) : '')
   history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}`)
 }
 
@@ -69,7 +79,7 @@ export const isDisplay = () => new URLSearchParams(location.search).has('display
 
 // The display link never asks for the location: every "here" is replaced by
 // the coordinates the device has right now.
-export async function displayUrl(connections) {
+export async function displayUrl(connections, cols) {
   const usesHere = connections.some((c) => [c.from, ...c.legs.map((l) => l.to)].includes(HERE))
   let fixed = connections
   if (usesHere) {
@@ -77,5 +87,5 @@ export async function displayUrl(connections) {
     const pin = (stop) => (stop === HERE ? `${lat},${lng}` : stop)
     fixed = connections.map((c) => ({ from: pin(c.from), legs: c.legs.map((l) => ({ ...l, to: pin(l.to) })) }))
   }
-  return `${location.origin}${location.pathname}?${toQuery(fixed)}&display=1`
+  return `${location.origin}${location.pathname}?${toQuery(fixed)}${colsQuery(cols)}&display=1`
 }
