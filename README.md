@@ -23,6 +23,10 @@ Example, both directions of one trip plus a second trip:
 
 Without parameters the page shows buses from Gertrud-Grunow-Straße to Alte Heide. Reversing, removing, filtering or adding a connection on the page rewrites the URL, so bookmark it to keep your setup.
 
+## TV display mode
+
+Add `&display=1` to the URL, or use the **Copy display link** button, to get a read-only board: the stop inputs, filters and add form are hidden, and the connections are laid out to fill the screen without scrolling. Remove `display=1` to edit again.
+
 ## Run
 
 ```bash

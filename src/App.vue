@@ -1,11 +1,31 @@
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConnectionCard from './ConnectionCard.vue'
 import { resolveStation } from './api'
-import { readConnections, writeConnections } from './url'
+import { displayUrl, isDisplay, readConnections, writeConnections } from './url'
 
 const connections = ref(readConnections())
 const now = ref(Date.now())
+const display = isDisplay()
+const copied = ref(false)
+
+// Landscape grid for the display board: one row up to 3 cards, then two, then three.
+const gridRows = computed(() => (connections.value.length <= 3 ? 1 : connections.value.length <= 8 ? 2 : 3))
+const gridCols = computed(() => Math.ceil(connections.value.length / gridRows.value))
+
+const clock = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
+
+async function copyDisplayLink() {
+  const url = displayUrl(connections.value)
+  try {
+    await navigator.clipboard.writeText(url)
+  } catch {
+    window.prompt('Copy this link', url)
+    return
+  }
+  copied.value = true
+  setTimeout(() => (copied.value = false), 2000)
+}
 
 const from = ref('')
 const to = ref('')
@@ -38,13 +58,33 @@ async function add() {
   }
 }
 
-let clock
-onMounted(() => (clock = setInterval(() => (now.value = Date.now()), 5_000)))
-onUnmounted(() => clearInterval(clock))
+let ticker
+onMounted(() => {
+  document.documentElement.classList.toggle('display', display)
+  ticker = setInterval(() => (now.value = Date.now()), 5_000)
+})
+onUnmounted(() => clearInterval(ticker))
 </script>
 
 <template>
-  <main>
+  <main v-if="display" class="board" :style="{ '--cols': gridCols, '--rows': gridRows }">
+    <header class="board-bar">
+      <span>Departures</span>
+      <span class="clock">{{ clock.format(now) }}</span>
+    </header>
+    <div class="board-grid">
+      <ConnectionCard v-for="(c, i) in connections" :key="i" :connection="c" :now="now" display />
+    </div>
+  </main>
+
+  <main v-else>
+    <div class="toolbar">
+      <span class="hint">Open the copied link on a TV for a fullscreen board without the controls.</span>
+      <button type="button" class="primary" :disabled="!connections.length" @click="copyDisplayLink">
+        {{ copied ? 'Copied' : 'Copy display link' }}
+      </button>
+    </div>
+
     <ConnectionCard
       v-for="(c, i) in connections"
       :key="i"

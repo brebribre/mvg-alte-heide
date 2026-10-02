@@ -7,6 +7,7 @@ const REFRESH_MS = 30_000
 const props = defineProps({
   connection: { type: Object, required: true },
   now: { type: Number, required: true },
+  display: { type: Boolean, default: false },
 })
 const emit = defineEmits(['swap', 'remove', 'toggle-mode'])
 
@@ -93,7 +94,13 @@ onUnmounted(() => clearInterval(timer))
 
 <template>
   <section class="card">
-    <div class="directions">
+    <h2 v-if="display" class="title">
+      {{ origin?.name ?? connection.from }}
+      <svg viewBox="0 0 24 24" aria-label="to"><path d="m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z" /></svg>
+      {{ destination?.name ?? connection.to }}
+    </h2>
+
+    <div v-if="!display" class="directions">
       <div class="rail" aria-hidden="true">
         <span class="dot"></span>
         <span class="dots"></span>
@@ -113,7 +120,7 @@ onUnmounted(() => clearInterval(timer))
       </div>
     </div>
 
-    <div class="chips">
+    <div v-if="!display" class="chips">
       <button
         v-for="(mode, key) in MODES"
         :key="key"
@@ -150,7 +157,10 @@ onUnmounted(() => clearInterval(timer))
         <div class="row detail">
           <span>
             <span :class="['status', status(route).tone]">{{ status(route).text }}</span>
-            · {{ formatTime(route.ride.departure) }} from {{ route.ride.from }}
+            <!-- On the board the stop is already in the title unless the route starts with a walk. -->
+            <template v-if="!display || route.legs[0].walk">
+              · {{ formatTime(route.ride.departure) }} from {{ route.ride.from }}
+            </template>
             <template v-if="route.ride.platform"> · Platform {{ route.ride.platform }}</template>
             · towards {{ route.ride.destination }}
           </span>
@@ -159,6 +169,6 @@ onUnmounted(() => clearInterval(timer))
       </li>
     </ul>
 
-    <p v-if="updatedAt" class="updated">Updated {{ formatTime(updatedAt) }}</p>
+    <p v-if="updatedAt && !display" class="updated">Updated {{ formatTime(updatedAt) }}</p>
   </section>
 </template>
