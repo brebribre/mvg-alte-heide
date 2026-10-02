@@ -2,6 +2,8 @@
 
 A tiny Vue 3 page that shows the next public transport connections between Munich stops, with live delays, in a Google Maps-style list. Each connection refreshes every 30 seconds.
 
+Live at https://mvg-alte-heide.vercel.app
+
 ## Choosing connections by URL
 
 Connections are read from repeated `c` parameters. Stops are separated by `~`, and a stop can be prefixed with `<modes>@` to say how to get there:
