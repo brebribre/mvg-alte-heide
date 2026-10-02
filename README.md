@@ -1,8 +1,8 @@
-# mvg-alte-heide
+# Find your connection
 
 A tiny Vue 3 page that shows the next public transport connections between Munich stops, with live delays, in a Google Maps-style list. Each connection refreshes every 30 seconds.
 
-Live at https://mvg-alte-heide.vercel.app
+Live at https://find-your-connection.vercel.app
 
 ## Choosing connections by URL
 
