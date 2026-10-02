@@ -1,87 +1,80 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { DESTINATION, ORIGIN, fetchConnections } from './api'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import ConnectionCard from './ConnectionCard.vue'
+import { resolveStation } from './api'
+import { readConnections, writeConnections } from './url'
 
-const REFRESH_MS = 30_000
-
-const connections = ref([])
-const error = ref('')
-const loading = ref(true)
-const updatedAt = ref(null)
+const connections = ref(readConnections())
 const now = ref(Date.now())
 
-const upcoming = computed(() =>
-  connections.value.filter((c) => c.departure > now.value - 30_000),
-)
+const from = ref('')
+const to = ref('')
+const adding = ref(false)
+const addError = ref('')
 
-const time = new Intl.DateTimeFormat('de-DE', {
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: 'Europe/Berlin',
-})
-const formatTime = (ms) => time.format(ms)
+watch(connections, writeConnections, { deep: true })
 
-function countdown(c) {
-  const minutes = Math.round((c.departure - now.value) / 60_000)
-  return minutes <= 0 ? 'now' : `${minutes} min`
+function swap(c) {
+  ;[c.from, c.to] = [c.to, c.from]
 }
 
-async function refresh() {
+function toggleMode(c, mode) {
+  c.modes = c.modes.includes(mode) ? c.modes.filter((m) => m !== mode) : [...c.modes, mode]
+}
+
+async function add() {
+  if (!from.value.trim() || !to.value.trim()) return
+  adding.value = true
+  addError.value = ''
   try {
-    connections.value = await fetchConnections()
-    updatedAt.value = Date.now()
-    error.value = ''
+    const [o, d] = await Promise.all([resolveStation(from.value), resolveStation(to.value)])
+    connections.value.push({ from: o.name, to: d.name, modes: [] })
+    from.value = ''
+    to.value = ''
   } catch (e) {
-    error.value = e.message || 'Could not load departures'
+    addError.value = e.message || 'Could not find that station'
   } finally {
-    loading.value = false
+    adding.value = false
   }
 }
 
-let refreshTimer, clockTimer
-onMounted(() => {
-  refresh()
-  refreshTimer = setInterval(refresh, REFRESH_MS)
-  clockTimer = setInterval(() => (now.value = Date.now()), 5_000)
-})
-onUnmounted(() => {
-  clearInterval(refreshTimer)
-  clearInterval(clockTimer)
-})
+let clock
+onMounted(() => (clock = setInterval(() => (now.value = Date.now()), 5_000)))
+onUnmounted(() => clearInterval(clock))
 </script>
 
 <template>
   <main>
-    <header>
-      <p class="eyebrow">Bus connections</p>
-      <h1>{{ ORIGIN.name }} <span class="arrow">→</span> {{ DESTINATION.name }}</h1>
-    </header>
+    <ConnectionCard
+      v-for="(c, i) in connections"
+      :key="i"
+      :connection="c"
+      :now="now"
+      @swap="swap(c)"
+      @remove="connections.splice(i, 1)"
+      @toggle-mode="toggleMode(c, $event)"
+    />
 
-    <p v-if="error" class="notice error">{{ error }}</p>
-    <p v-if="loading" class="notice">Loading departures…</p>
-    <p v-else-if="!upcoming.length && !error" class="notice">No buses found right now.</p>
-
-    <ul v-if="upcoming.length">
-      <li v-for="c in upcoming" :key="`${c.line}-${c.planned}`" :class="{ cancelled: c.cancelled }">
-        <span class="line">{{ c.line }}</span>
-        <div class="info">
-          <span class="destination">{{ c.destination }}</span>
-          <span class="times">
-            {{ formatTime(c.planned) }}
-            <span v-if="c.cancelled" class="late">cancelled</span>
-            <span v-else-if="c.delay > 0" class="late">+{{ c.delay }}</span>
-            <span v-else-if="c.realtime" class="ontime">on time</span>
-            · arrives {{ formatTime(c.arrival) }}
-          </span>
+    <form class="card add" @submit.prevent="add">
+      <h2>Add connection</h2>
+      <div class="directions">
+        <div class="rail" aria-hidden="true">
+          <span class="dot"></span>
+          <span class="dots"></span>
+          <svg class="pin" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" /></svg>
         </div>
-        <span class="countdown">{{ c.cancelled ? '–' : countdown(c) }}</span>
-      </li>
-    </ul>
+        <div class="fields">
+          <input v-model="from" class="field" placeholder="Choose starting stop" aria-label="Starting stop" />
+          <input v-model="to" class="field" placeholder="Choose destination stop" aria-label="Destination stop" />
+        </div>
+      </div>
+      <p v-if="addError" class="notice bad">{{ addError }}</p>
+      <button type="submit" class="primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
+    </form>
 
-    <footer>
-      <span v-if="updatedAt">Updated {{ formatTime(updatedAt) }} · refreshes every 30 s</span>
-      <button type="button" @click="refresh">Refresh</button>
-    </footer>
-    <p class="credit">Data from the unofficial MVG API. Not affiliated with MVG.</p>
+    <p class="credit">
+      Connections are stored in the page URL, so bookmark or share it to keep them. Data from the unofficial MVG API;
+      not affiliated with MVG or Google.
+    </p>
   </main>
 </template>
