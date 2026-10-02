@@ -7,6 +7,11 @@ import { displayUrl, isDisplay, readConnections, writeConnections } from './url'
 const connections = ref(readConnections())
 const now = ref(Date.now())
 const display = isDisplay()
+
+// Wide landscape screens get the departures in a panel on the right.
+const splitQuery = window.matchMedia('(orientation: landscape) and (min-width: 900px)')
+const split = ref(splitQuery.matches)
+const onSplitChange = (e) => (split.value = e.matches)
 const copied = ref(false)
 const copyError = ref('')
 
@@ -87,8 +92,12 @@ let ticker
 onMounted(() => {
   document.documentElement.classList.toggle('display', display)
   ticker = setInterval(() => (now.value = Date.now()), 5_000)
+  splitQuery.addEventListener('change', onSplitChange)
 })
-onUnmounted(() => clearInterval(ticker))
+onUnmounted(() => {
+  clearInterval(ticker)
+  splitQuery.removeEventListener('change', onSplitChange)
+})
 </script>
 
 <template>
@@ -102,54 +111,59 @@ onUnmounted(() => clearInterval(ticker))
     </div>
   </main>
 
-  <main v-else>
-    <div class="toolbar">
-      <span class="hint">Open the copied link on a TV for a fullscreen board without the controls.</span>
-      <button type="button" class="primary" :disabled="!connections.length" @click="copyDisplayLink">
-        {{ copied ? 'Copied' : 'Copy display link' }}
-      </button>
-    </div>
-    <p v-if="copyError" class="notice bad card">{{ copyError }}</p>
-
-    <ConnectionCard
-      v-for="(c, i) in connections"
-      :key="i"
-      :connection="c"
-      :now="now"
-      @swap="swap(c)"
-      @remove="connections.splice(i, 1)"
-      @toggle-mode="toggleMode(c, $event)"
-      @add-stop="addStop(c, $event)"
-      @remove-stop="c.legs.splice($event, 1)"
-      @move-stop="moveStop(c, $event)"
-    />
-
-    <form class="card add" @submit.prevent="add">
-      <h2>Add connection</h2>
-      <div class="directions">
-        <div class="rail" aria-hidden="true">
-          <span class="dot"></span>
-          <span class="dots"></span>
-          <svg class="pin" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" /></svg>
-        </div>
-        <div class="fields">
-          <input v-model="from" class="field" placeholder="Choose starting stop" aria-label="Starting stop" />
-          <input v-model="to" class="field" placeholder="Choose destination stop" aria-label="Destination stop" />
-        </div>
-      </div>
-      <p v-if="addError" class="notice bad">{{ addError }}</p>
-      <div class="add-actions">
-        <button type="button" class="text" @click="from = 'Current location'">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06ZM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" /></svg>
-          Start from current location
+  <main v-else :class="{ split }">
+    <div class="sidebar">
+      <div class="toolbar">
+        <span class="hint">Open the copied link on a TV for a fullscreen board without the controls.</span>
+        <button type="button" class="primary" :disabled="!connections.length" @click="copyDisplayLink">
+          {{ copied ? 'Copied' : 'Copy display link' }}
         </button>
-        <button type="submit" class="primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
       </div>
-    </form>
+      <p v-if="copyError" class="notice bad card">{{ copyError }}</p>
 
-    <p class="credit">
-      Connections are stored in the page URL, so bookmark or share it to keep them. Data from the unofficial MVG API;
-      not affiliated with MVG or Google.
-    </p>
+      <ConnectionCard
+        v-for="(c, i) in connections"
+        :key="i"
+        :connection="c"
+        :now="now"
+        :split="split"
+        @swap="swap(c)"
+        @remove="connections.splice(i, 1)"
+        @toggle-mode="toggleMode(c, $event)"
+        @add-stop="addStop(c, $event)"
+        @remove-stop="c.legs.splice($event, 1)"
+        @move-stop="moveStop(c, $event)"
+      />
+
+      <form class="card add" @submit.prevent="add">
+        <h2>Add connection</h2>
+        <div class="directions">
+          <div class="rail" aria-hidden="true">
+            <span class="dot"></span>
+            <span class="dots"></span>
+            <svg class="pin" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" /></svg>
+          </div>
+          <div class="fields">
+            <input v-model="from" class="field" placeholder="Choose starting stop" aria-label="Starting stop" />
+            <input v-model="to" class="field" placeholder="Choose destination stop" aria-label="Destination stop" />
+          </div>
+        </div>
+        <p v-if="addError" class="notice bad">{{ addError }}</p>
+        <div class="add-actions">
+          <button type="button" class="text" @click="from = 'Current location'">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06ZM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" /></svg>
+            Start from current location
+          </button>
+          <button type="submit" class="primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
+        </div>
+      </form>
+
+      <p class="credit">
+        Connections are stored in the page URL, so bookmark or share it to keep them. Data from the unofficial MVG API;
+        not affiliated with MVG or Google.
+      </p>
+    </div>
+
+    <div v-show="split" id="results" class="results"></div>
   </main>
 </template>
