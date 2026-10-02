@@ -31,7 +31,7 @@ Use `here` as a stop (or **Start from current location** in the add form) to rou
 
 ### Fixed routes (via stops)
 
-Via stops are optional. Without them MVG picks the route. With them, each leg is looked up on its own and the rides are chained, allowing 2 minutes to change at each via stop, so the route always changes where you asked. When several early rides lead to the same onward connection, only the last one that still makes it is listed. On the page, use **Add a stop to change at** on a connection. **Done** folds a connection's controls into a one-line summary (click it to edit again). Drag a stop by its handle to reorder the sequence; the transport filters stay with their position (first leg, second leg, …).
+Via stops are optional. Without them MVG picks the route. With them, each leg is looked up on its own and the rides are chained, allowing 2 minutes to change at each via stop, so the route always changes where you asked. When several early rides lead to the same onward connection, only the last one that still makes it is listed. On the page, use **Add a stop to change at** on a connection. **Done** folds a connection, including its departures, into a one-line summary (click it to open it again). Drag a stop by its handle to reorder the sequence; the transport filters stay with their position (first leg, second leg, …).
 
 Without parameters the page shows buses from Gertrud-Grunow-Straße to Alte Heide. Reversing, removing, filtering or adding a connection on the page rewrites the URL, so bookmark it to keep your setup.
 

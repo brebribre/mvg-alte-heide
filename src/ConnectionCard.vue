@@ -45,7 +45,7 @@ function dragEnd(commit) {
   if (commit && from !== over) emit('move-stop', { from, to: over })
 }
 
-// "Done" folds the editing controls into a one-line summary; click it to edit again.
+// "Done" folds the whole connection into a one-line summary; click it to open it again.
 const open = ref(true)
 
 const viaLabel = computed(() =>
@@ -208,7 +208,7 @@ onUnmounted(() => {
       <small v-if="viaLabel" class="via">{{ viaLabel }}</small>
     </h2>
 
-    <button v-if="!display && !open" type="button" class="summary" title="Edit connection" @click="open = true">
+    <button v-if="!display && !open" type="button" class="summary" title="Show connection" @click="open = true">
       <span class="summary-text">
         <strong>{{ stopLabel(0) }} → {{ stopLabel(lastStop) }}</strong>
         <small>{{ summary }}</small>
@@ -291,41 +291,43 @@ onUnmounted(() => {
       <p v-if="stopError" class="notice bad">{{ stopError }}</p>
     </div>
 
-    <p v-if="error" class="notice bad">{{ error }}</p>
-    <p v-else-if="loading" class="notice">Loading connections…</p>
-    <p v-else-if="!upcoming.length" class="notice">No connections found right now.</p>
+    <template v-if="display || open">
+      <p v-if="error" class="notice bad">{{ error }}</p>
+      <p v-else-if="loading" class="notice">Loading connections…</p>
+      <p v-else-if="!upcoming.length" class="notice">No connections found right now.</p>
 
-    <ul v-if="upcoming.length" class="routes">
-      <li v-for="route in upcoming" :key="route.id" :class="{ cancelled: route.cancelled }">
-        <div class="row">
-          <span class="span">{{ formatTime(route.departure) }} – {{ formatTime(route.arrival) }}</span>
-          <span class="duration">{{ duration(route) }}</span>
-        </div>
-        <div class="legs">
-          <template v-for="(leg, i) in route.legs" :key="i">
-            <svg v-if="i" class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6Z" /></svg>
-            <span v-if="leg.walk" class="walk" :title="`Walk to ${leg.to}`">
-              <svg viewBox="0 0 24 24" aria-label="Walk"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2ZM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7Z" /></svg>
-              <small>{{ leg.minutes }}</small>
-            </span>
-            <span v-else :class="lineClass(leg)" :title="`${leg.label} towards ${leg.destination}`">{{ leg.label }}</span>
-          </template>
-        </div>
-        <div class="row detail">
-          <span>
-            <span :class="['status', status(route).tone]">{{ status(route).text }}</span>
-            <!-- On the board the stop is already in the title unless the route starts with a walk. -->
-            <template v-if="!display || route.legs[0].walk">
-              · {{ formatTime(route.ride.departure) }} from {{ route.ride.from }}
+      <ul v-if="upcoming.length" class="routes">
+        <li v-for="route in upcoming" :key="route.id" :class="{ cancelled: route.cancelled }">
+          <div class="row">
+            <span class="span">{{ formatTime(route.departure) }} – {{ formatTime(route.arrival) }}</span>
+            <span class="duration">{{ duration(route) }}</span>
+          </div>
+          <div class="legs">
+            <template v-for="(leg, i) in route.legs" :key="i">
+              <svg v-if="i" class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6Z" /></svg>
+              <span v-if="leg.walk" class="walk" :title="`Walk to ${leg.to}`">
+                <svg viewBox="0 0 24 24" aria-label="Walk"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2ZM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7Z" /></svg>
+                <small>{{ leg.minutes }}</small>
+              </span>
+              <span v-else :class="lineClass(leg)" :title="`${leg.label} towards ${leg.destination}`">{{ leg.label }}</span>
             </template>
-            <template v-if="route.ride.platform"> · Platform {{ route.ride.platform }}</template>
-            · towards {{ route.ride.destination }}
-          </span>
-          <span v-if="!route.cancelled" class="countdown">{{ countdown(route) }}</span>
-        </div>
-      </li>
-    </ul>
+          </div>
+          <div class="row detail">
+            <span>
+              <span :class="['status', status(route).tone]">{{ status(route).text }}</span>
+              <!-- On the board the stop is already in the title unless the route starts with a walk. -->
+              <template v-if="!display || route.legs[0].walk">
+                · {{ formatTime(route.ride.departure) }} from {{ route.ride.from }}
+              </template>
+              <template v-if="route.ride.platform"> · Platform {{ route.ride.platform }}</template>
+              · towards {{ route.ride.destination }}
+            </span>
+            <span v-if="!route.cancelled" class="countdown">{{ countdown(route) }}</span>
+          </div>
+        </li>
+      </ul>
 
-    <p v-if="updatedAt && !display" class="updated">Updated {{ formatTime(updatedAt) }}</p>
+      <p v-if="updatedAt && !display" class="updated">Updated {{ formatTime(updatedAt) }}</p>
+    </template>
   </section>
 </template>
