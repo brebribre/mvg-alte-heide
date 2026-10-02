@@ -87,8 +87,13 @@ async function fetchPage(originId, destinationId, modes, from) {
     .filter((r) => r.ride) // drop walk-only suggestions
 }
 
-export async function fetchRoutes(originId, destinationId, modes = []) {
-  const first = await fetchPage(originId, destinationId, modes, new Date())
+const dedupe = (routes) => {
+  const seen = new Set()
+  return routes.filter((r) => !seen.has(r.id) && seen.add(r.id))
+}
+
+async function fetchSegment(originId, destinationId, modes, from = new Date()) {
+  const first = await fetchPage(originId, destinationId, modes, from)
 
   // The routes endpoint only returns a handful of results, so ask once more
   // starting after the last one to fill the list.
@@ -98,9 +103,74 @@ export async function fetchRoutes(originId, destinationId, modes = []) {
     const next = await fetchPage(originId, destinationId, modes, new Date(lastStart + 60_000)).catch(() => [])
     routes = [...first, ...next]
   }
+  return dedupe(routes).sort((a, b) => a.departure - b.departure)
+}
 
-  const seen = new Set()
-  return routes
-    .filter((r) => !seen.has(r.id) && seen.add(r.id))
+// Time allowed for changing vehicles at a via stop.
+const TRANSFER_MS = 2 * 60_000
+const MAX_CHAINS = 6
+
+// Earliest-arriving ride in `pool` that can still be caught at `ready`.
+const nextRide = (pool, ready) =>
+  pool
+    .filter((r) => !r.cancelled && r.departure >= ready)
+    .sort((a, b) => a.arrival - b.arrival || b.departure - a.departure)[0]
+
+// Fixed itinerary through via stops: every segment is looked up on its own and
+// the rides are chained together, so the route always changes where asked.
+async function fetchChained(stopIds, legModes) {
+  const first = await fetchSegment(stopIds[0], stopIds[1], legModes[0])
+  let chains = first
+    .filter((r) => !r.cancelled)
+    .slice(0, MAX_CHAINS)
+    .map((r) => [r])
+
+  for (let i = 1; i < stopIds.length - 1 && chains.length; i++) {
+    const [from, to, modes] = [stopIds[i], stopIds[i + 1], legModes[i]]
+    const earliest = Math.min(...chains.map((c) => c.at(-1).arrival)) + TRANSFER_MS
+    const pool = await fetchPage(from, to, modes, new Date(earliest))
+
+    const extended = []
+    for (const chain of chains) {
+      const ready = chain.at(-1).arrival + TRANSFER_MS
+      let ride = nextRide(pool, ready)
+      if (!ride) {
+        pool.push(...(await fetchPage(from, to, modes, new Date(ready)).catch(() => [])))
+        ride = nextRide(pool, ready)
+      }
+      if (ride) extended.push([...chain, ride])
+    }
+    chains = extended
+  }
+
+  // Several early rides can end up on the same onward connection; only the
+  // last one that still makes it is worth showing.
+  const byOnward = new Map()
+  for (const chain of chains) {
+    const key = chain.slice(1).map((r) => r.id).join('|')
+    const best = byOnward.get(key)
+    if (!best || chain[0].departure > best[0].departure) byOnward.set(key, chain)
+  }
+
+  return [...byOnward.values()]
+    .map((chain) => {
+      const legs = chain.flatMap((r) => r.legs)
+      return {
+        id: chain.map((r) => r.id).join('|'),
+        legs,
+        ride: chain[0].ride,
+        departure: chain[0].departure,
+        arrival: chain.at(-1).arrival,
+        cancelled: false,
+      }
+    })
     .sort((a, b) => a.ride.departure - b.ride.departure)
+}
+
+// `stopIds` is origin, optional via stops, destination; `legModes[i]` filters
+// the transport used between stop i and stop i + 1.
+export async function fetchRoutes(stopIds, legModes) {
+  if (stopIds.length > 2) return fetchChained(stopIds, legModes)
+  const routes = await fetchSegment(stopIds[0], stopIds[1], legModes[0])
+  return routes.sort((a, b) => a.ride.departure - b.ride.departure)
 }

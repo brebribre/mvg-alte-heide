@@ -35,11 +35,20 @@ const addError = ref('')
 watch(connections, writeConnections, { deep: true })
 
 function swap(c) {
-  ;[c.from, c.to] = [c.to, c.from]
+  const stops = [c.from, ...c.legs.map((l) => l.to)].reverse()
+  const modes = c.legs.map((l) => l.modes).reverse()
+  c.from = stops[0]
+  c.legs = modes.map((m, i) => ({ to: stops[i + 1], modes: m }))
 }
 
-function toggleMode(c, mode) {
-  c.modes = c.modes.includes(mode) ? c.modes.filter((m) => m !== mode) : [...c.modes, mode]
+function toggleMode(c, { leg, mode }) {
+  const l = c.legs[leg]
+  l.modes = l.modes.includes(mode) ? l.modes.filter((m) => m !== mode) : [...l.modes, mode]
+}
+
+// Via stops go in just before the destination.
+function addStop(c, name) {
+  c.legs.splice(c.legs.length - 1, 0, { to: name, modes: [] })
 }
 
 async function add() {
@@ -48,7 +57,7 @@ async function add() {
   addError.value = ''
   try {
     const [o, d] = await Promise.all([resolveStation(from.value), resolveStation(to.value)])
-    connections.value.push({ from: o.name, to: d.name, modes: [] })
+    connections.value.push({ from: o.name, legs: [{ to: d.name, modes: [] }] })
     from.value = ''
     to.value = ''
   } catch (e) {
@@ -93,6 +102,8 @@ onUnmounted(() => clearInterval(ticker))
       @swap="swap(c)"
       @remove="connections.splice(i, 1)"
       @toggle-mode="toggleMode(c, $event)"
+      @add-stop="addStop(c, $event)"
+      @remove-stop="c.legs.splice($event, 1)"
     />
 
     <form class="card add" @submit.prevent="add">

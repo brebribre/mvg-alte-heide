@@ -9,10 +9,31 @@ const props = defineProps({
   now: { type: Number, required: true },
   display: { type: Boolean, default: false },
 })
-const emit = defineEmits(['swap', 'remove', 'toggle-mode'])
+const emit = defineEmits(['swap', 'remove', 'toggle-mode', 'add-stop', 'remove-stop'])
 
-const origin = ref(null)
-const destination = ref(null)
+// Origin, via stops and destination as typed in the URL, and once resolved.
+const stopNames = computed(() => [props.connection.from, ...props.connection.legs.map((l) => l.to)])
+const stations = ref([])
+const stopLabel = (i) => stations.value[i]?.name ?? stopNames.value[i]
+const lastStop = computed(() => stopNames.value.length - 1)
+
+const newStop = ref('')
+const addingStop = ref(false)
+const stopError = ref('')
+
+async function addStop() {
+  if (!newStop.value.trim()) return
+  stopError.value = ''
+  try {
+    const station = await resolveStation(newStop.value)
+    emit('add-stop', station.name)
+    newStop.value = ''
+    addingStop.value = false
+  } catch (e) {
+    stopError.value = e.message || 'Could not find that station'
+  }
+}
+
 const routes = ref([])
 const error = ref('')
 const loading = ref(true)
@@ -57,13 +78,15 @@ let request = 0
 
 async function refresh() {
   const current = ++request
-  const { from, to, modes } = props.connection
+  const legModes = props.connection.legs.map((l) => l.modes)
   try {
-    const [o, d] = await Promise.all([resolveStation(from), resolveStation(to)])
+    const resolved = await Promise.all(stopNames.value.map(resolveStation))
     if (current !== request) return
-    origin.value = o
-    destination.value = d
-    const result = await fetchRoutes(o.id, d.id, modes)
+    stations.value = resolved
+    const result = await fetchRoutes(
+      resolved.map((s) => s.id),
+      legModes,
+    )
     if (current !== request) return
     routes.value = result
     updatedAt.value = Date.now()
@@ -77,8 +100,9 @@ async function refresh() {
 }
 
 watch(
-  () => [props.connection.from, props.connection.to, props.connection.modes.join(',')],
+  () => JSON.stringify(props.connection),
   () => {
+    stations.value = []
     routes.value = []
     loading.value = true
     refresh()
@@ -96,9 +120,10 @@ onUnmounted(() => clearInterval(timer))
 <template>
   <section class="card">
     <h2 v-if="display" class="title">
-      {{ origin?.name ?? connection.from }}
+      {{ stopLabel(0) }}
       <svg viewBox="0 0 24 24" aria-label="to"><path d="m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z" /></svg>
-      {{ destination?.name ?? connection.to }}
+      {{ stopLabel(lastStop) }}
+      <small v-if="lastStop > 1" class="via">via {{ stopNames.slice(1, -1).map((_, i) => stopLabel(i + 1)).join(', ') }}</small>
     </h2>
 
     <div v-if="!display" class="directions">
@@ -108,8 +133,19 @@ onUnmounted(() => clearInterval(timer))
         <svg class="pin" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" /></svg>
       </div>
       <div class="fields">
-        <div class="field">{{ origin?.name ?? connection.from }}</div>
-        <div class="field">{{ destination?.name ?? connection.to }}</div>
+        <div v-for="(_, i) in stopNames" :key="i" class="field" :class="{ via: i > 0 && i < lastStop }">
+          <span>{{ stopLabel(i) }}</span>
+          <button
+            v-if="i > 0 && i < lastStop"
+            type="button"
+            class="icon small"
+            title="Remove stop"
+            aria-label="Remove stop"
+            @click="emit('remove-stop', i - 1)"
+          >
+            <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z" /></svg>
+          </button>
+        </div>
       </div>
       <div class="actions">
         <button type="button" class="icon" title="Reverse direction" aria-label="Reverse direction" @click="emit('swap')">
@@ -121,18 +157,29 @@ onUnmounted(() => clearInterval(timer))
       </div>
     </div>
 
-    <div v-if="!display" class="chips">
-      <button
-        v-for="(mode, key) in MODES"
-        :key="key"
-        type="button"
-        class="chip"
-        :class="{ active: connection.modes.includes(key) }"
-        :aria-pressed="connection.modes.includes(key)"
-        @click="emit('toggle-mode', key)"
-      >
-        {{ mode.label }}
-      </button>
+    <div v-if="!display" class="legs-config">
+      <div v-for="(leg, l) in connection.legs" :key="l" class="chips">
+        <span v-if="connection.legs.length > 1" class="chips-label">to {{ stopLabel(l + 1) }}</span>
+        <button
+          v-for="(mode, key) in MODES"
+          :key="key"
+          type="button"
+          class="chip"
+          :class="{ active: leg.modes.includes(key) }"
+          :aria-pressed="leg.modes.includes(key)"
+          @click="emit('toggle-mode', { leg: l, mode: key })"
+        >
+          {{ mode.label }}
+        </button>
+      </div>
+
+      <form v-if="addingStop" class="stop-form" @submit.prevent="addStop">
+        <input v-model="newStop" class="field" placeholder="Stop to change at" aria-label="Stop to change at" />
+        <button type="submit" class="text">Add</button>
+        <button type="button" class="text muted" @click="addingStop = false">Cancel</button>
+      </form>
+      <button v-else type="button" class="text" @click="addingStop = true">+ Add a stop to change at</button>
+      <p v-if="stopError" class="notice bad">{{ stopError }}</p>
     </div>
 
     <p v-if="error" class="notice bad">{{ error }}</p>

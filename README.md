@@ -4,22 +4,28 @@ A tiny Vue 3 page that shows the next public transport connections between Munic
 
 ## Choosing connections by URL
 
-Connections are read from repeated `c` parameters:
+Connections are read from repeated `c` parameters. Stops are separated by `~`, and a stop can be prefixed with `<modes>@` to say how to get there:
 
 ```
-?c=<from>~<to>            any transport
-?c=<from>~<to>~bus,tram   only these modes
+?c=<from>~<to>                               any transport
+?c=<from>~bus,tram@<to>                      only these modes
+?c=<from>~bus@<via>~ubahn@<via>~sbahn@<to>   fixed route through via stops
 ```
 
-- `<from>` and `<to>` are station names (`Alte Heide`) or MVG global IDs (`de:09162:530`).
-- Modes: `bus`, `ubahn`, `tram`, `sbahn`, `bahn`.
+- Stops are station names (`Alte Heide`) or MVG global IDs (`de:09162:530`).
+- Modes: `bus`, `ubahn`, `tram`, `sbahn`, `bahn`. They are optional on every leg.
 - Repeat `c` for several connections on one page.
+- The older form `?c=<from>~<to>~bus` still works.
 
-Example, both directions of one trip plus a second trip:
+Example: a simple bus connection, plus a fixed route that takes the bus to Alte Heide, the U-Bahn to Marienplatz and the S-Bahn to Fasanenpark:
 
 ```
-?c=Gertrud-Grunow-Straße~Alte Heide~bus&c=Alte Heide~Gertrud-Grunow-Straße~bus&c=Alte Heide~Marienplatz
+?c=Gertrud-Grunow-Straße~bus@Alte Heide&c=Gertrud-Grunow-Straße~bus@Alte Heide~ubahn@Marienplatz~sbahn@Fasanenpark
 ```
+
+### Fixed routes (via stops)
+
+Via stops are optional. Without them MVG picks the route. With them, each leg is looked up on its own and the rides are chained, allowing 2 minutes to change at each via stop, so the route always changes where you asked. When several early rides lead to the same onward connection, only the last one that still makes it is listed. On the page, use **Add a stop to change at** on a connection.
 
 Without parameters the page shows buses from Gertrud-Grunow-Straße to Alte Heide. Reversing, removing, filtering or adding a connection on the page rewrites the URL, so bookmark it to keep your setup.
 
