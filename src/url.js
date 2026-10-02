@@ -4,9 +4,10 @@
 //   ?c=<from>~bus,tram@<to>                    only these modes
 //   ?c=<from>~bus@<via>~ubahn@<via>~sbahn@<to> fixed route through via stops
 //   &display=1                                 read-only fullscreen board
-// Stops are station names or MVG global IDs (de:09162:530).
+// Stops are station names, MVG global IDs (de:09162:530), `here` for the
+// device's current location, or fixed coordinates (48.18372,11.59668).
 // The older form ?c=<from>~<to>~bus,tram is still read.
-import { MODES } from './api'
+import { HERE, MODES, currentPosition } from './api'
 
 // A connection is { from, legs: [{ to, modes }] }; every leg but the last ends at a via stop.
 const DEFAULT = [{ from: 'Gertrud-Grunow-Straße', legs: [{ to: 'Alte Heide', modes: ['bus'] }] }]
@@ -66,6 +67,15 @@ export function writeConnections(connections) {
 // `display=1` turns the page into a read-only, non-scrolling board (for a TV).
 export const isDisplay = () => new URLSearchParams(location.search).has('display')
 
-export function displayUrl(connections) {
-  return `${location.origin}${location.pathname}?${toQuery(connections)}&display=1`
+// The display link never asks for the location: every "here" is replaced by
+// the coordinates the device has right now.
+export async function displayUrl(connections) {
+  const usesHere = connections.some((c) => [c.from, ...c.legs.map((l) => l.to)].includes(HERE))
+  let fixed = connections
+  if (usesHere) {
+    const { lat, lng } = await currentPosition()
+    const pin = (stop) => (stop === HERE ? `${lat},${lng}` : stop)
+    fixed = connections.map((c) => ({ from: pin(c.from), legs: c.legs.map((l) => ({ ...l, to: pin(l.to) })) }))
+  }
+  return `${location.origin}${location.pathname}?${toQuery(fixed)}&display=1`
 }

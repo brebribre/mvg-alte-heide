@@ -12,7 +12,7 @@ Connections are read from repeated `c` parameters. Stops are separated by `~`, a
 ?c=<from>~bus@<via>~ubahn@<via>~sbahn@<to>   fixed route through via stops
 ```
 
-- Stops are station names (`Alte Heide`) or MVG global IDs (`de:09162:530`).
+- Stops are station names (`Alte Heide`), MVG global IDs (`de:09162:530`), `here`, or coordinates (`48.18372,11.59668`).
 - Modes: `bus`, `ubahn`, `tram`, `sbahn`, `bahn`. They are optional on every leg.
 - Repeat `c` for several connections on one page.
 - The older form `?c=<from>~<to>~bus` still works.
@@ -22,6 +22,12 @@ Example: a simple bus connection, plus a fixed route that takes the bus to Alte 
 ```
 ?c=Gertrud-Grunow-Straße~bus@Alte Heide&c=Gertrud-Grunow-Straße~bus@Alte Heide~ubahn@Marienplatz~sbahn@Fasanenpark
 ```
+
+### Current location
+
+Use `here` as a stop (or **Start from current location** in the add form) to route from wherever the device is. The browser asks for location permission, and the first leg becomes the walk to the nearest suitable stop.
+
+**Copy display link** replaces `here` with the coordinates the device has at that moment, for example `?c=48.18372,11.59668~Alte Heide&display=1`, so the TV never asks for a location. Note that this link therefore contains those coordinates.
 
 ### Fixed routes (via stops)
 

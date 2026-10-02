@@ -8,6 +8,7 @@ const connections = ref(readConnections())
 const now = ref(Date.now())
 const display = isDisplay()
 const copied = ref(false)
+const copyError = ref('')
 
 // Landscape grid for the display board: one row up to 3 cards, then two, then three.
 const gridRows = computed(() => (connections.value.length <= 3 ? 1 : connections.value.length <= 8 ? 2 : 3))
@@ -16,7 +17,14 @@ const gridCols = computed(() => Math.ceil(connections.value.length / gridRows.va
 const clock = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
 
 async function copyDisplayLink() {
-  const url = displayUrl(connections.value)
+  copyError.value = ''
+  let url
+  try {
+    url = await displayUrl(connections.value)
+  } catch (e) {
+    copyError.value = e.message
+    return
+  }
   try {
     await navigator.clipboard.writeText(url)
   } catch {
@@ -57,7 +65,7 @@ async function add() {
   addError.value = ''
   try {
     const [o, d] = await Promise.all([resolveStation(from.value), resolveStation(to.value)])
-    connections.value.push({ from: o.name, legs: [{ to: d.name, modes: [] }] })
+    connections.value.push({ from: o.token, legs: [{ to: d.token, modes: [] }] })
     from.value = ''
     to.value = ''
   } catch (e) {
@@ -93,6 +101,7 @@ onUnmounted(() => clearInterval(ticker))
         {{ copied ? 'Copied' : 'Copy display link' }}
       </button>
     </div>
+    <p v-if="copyError" class="notice bad card">{{ copyError }}</p>
 
     <ConnectionCard
       v-for="(c, i) in connections"
@@ -120,7 +129,13 @@ onUnmounted(() => clearInterval(ticker))
         </div>
       </div>
       <p v-if="addError" class="notice bad">{{ addError }}</p>
-      <button type="submit" class="primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
+      <div class="add-actions">
+        <button type="button" class="text" @click="from = 'Current location'">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06ZM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z" /></svg>
+          Start from current location
+        </button>
+        <button type="submit" class="primary" :disabled="adding">{{ adding ? 'Adding…' : 'Add' }}</button>
+      </div>
     </form>
 
     <p class="credit">

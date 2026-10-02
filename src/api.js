@@ -17,24 +17,82 @@ async function getJson(path, params) {
   return res.json()
 }
 
+export const HERE = 'here'
+const COORDS = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/
+const POSITION_TTL_MS = 2 * 60_000
+
+let position = null
+
+// The device's location, asked for once and reused for a couple of minutes.
+export function currentPosition() {
+  if (position && Date.now() - position.at < POSITION_TTL_MS) return position.promise
+  const promise = new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('This browser cannot share its location'))
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ lat: +coords.latitude.toFixed(5), lng: +coords.longitude.toFixed(5) }),
+      () => reject(new Error('Could not get your location. Allow location access and try again.')),
+      { maximumAge: POSITION_TTL_MS, timeout: 15_000 },
+    )
+  })
+  position = { at: Date.now(), promise }
+  promise.catch(() => (position = null))
+  return promise
+}
+
 const stationCache = new Map()
 
-// Accepts a station name ("Alte Heide") or a global ID ("de:09162:530").
-export function resolveStation(query) {
+function lookup(query) {
   const key = query.trim().toLowerCase()
   if (!stationCache.has(key)) {
-    const lookup = /^de:\d+:\d+$/.test(key)
-      ? getJson(`/stations/${key}`)
-      : getJson('/locations', { query: query.trim() }).then((hits) => {
-          const station = hits.find((h) => h.type === 'STATION')
-          if (!station) throw new Error(`No station found for "${query}"`)
-          return station
-        })
-    const result = lookup.then((s) => ({ id: s.globalId, name: s.name }))
+    const result = getJson('/locations', { query: query.trim() }).then((hits) => {
+      const station = hits.find((h) => h.type === 'STATION')
+      if (!station) throw new Error(`No station found for "${query}"`)
+      return station
+    })
     result.catch(() => stationCache.delete(key))
     stationCache.set(key, result)
   }
   return stationCache.get(key)
+}
+
+function nearestStationName(lat, lng) {
+  const key = `near:${lat},${lng}`
+  if (!stationCache.has(key)) {
+    stationCache.set(
+      key,
+      getJson('/stations/nearby', { latitude: lat, longitude: lng })
+        .then((stations) => stations[0]?.name ?? null)
+        .catch(() => null),
+    )
+  }
+  return stationCache.get(key)
+}
+
+// Turns what is written in the URL into a routable place. Accepts a station
+// name ("Alte Heide"), a global ID ("de:09162:530"), "here" for the device's
+// current location, or fixed coordinates ("48.18372,11.59668").
+// `token` is how the place is written back to the URL.
+export async function resolveStation(query) {
+  const text = query.trim()
+
+  if (/^(here|current location)$/i.test(text)) {
+    return { ...(await currentPosition()), name: 'Current location', token: HERE }
+  }
+
+  const coords = text.match(COORDS)
+  if (coords) {
+    const [lat, lng] = [Number(coords[1]), Number(coords[2])]
+    const near = await nearestStationName(lat, lng)
+    return { lat, lng, name: near ? `Near ${near}` : 'Saved location', token: `${lat},${lng}` }
+  }
+
+  if (/^de:\d+:\d+$/i.test(text)) {
+    const s = await getJson(`/stations/${text.toLowerCase()}`)
+    return { id: s.globalId, name: s.name, token: s.globalId }
+  }
+
+  const s = await lookup(text)
+  return { id: s.globalId, name: s.name, token: s.name }
 }
 
 const ms = (iso) => new Date(iso).getTime()
@@ -60,10 +118,16 @@ function toLeg(part) {
   }
 }
 
-async function fetchPage(originId, destinationId, modes, from) {
+// A place is a station ({ id }) or a point ({ lat, lng }).
+const placeParams = (place, side) =>
+  place.id
+    ? { [`${side}StationGlobalId`]: place.id }
+    : { [`${side}Latitude`]: place.lat, [`${side}Longitude`]: place.lng }
+
+async function fetchPage(origin, destination, modes, from) {
   const params = {
-    originStationGlobalId: originId,
-    destinationStationGlobalId: destinationId,
+    ...placeParams(origin, 'origin'),
+    ...placeParams(destination, 'destination'),
     routingDateTime: from.toISOString(),
     routingDateTimeIsArrival: 'false',
   }
@@ -92,15 +156,15 @@ const dedupe = (routes) => {
   return routes.filter((r) => !seen.has(r.id) && seen.add(r.id))
 }
 
-async function fetchSegment(originId, destinationId, modes, from = new Date()) {
-  const first = await fetchPage(originId, destinationId, modes, from)
+async function fetchSegment(origin, destination, modes, from = new Date()) {
+  const first = await fetchPage(origin, destination, modes, from)
 
   // The routes endpoint only returns a handful of results, so ask once more
   // starting after the last one to fill the list.
   let routes = first
   if (first.length) {
     const lastStart = Math.max(...first.map((r) => r.legs[0].plannedDeparture))
-    const next = await fetchPage(originId, destinationId, modes, new Date(lastStart + 60_000)).catch(() => [])
+    const next = await fetchPage(origin, destination, modes, new Date(lastStart + 60_000)).catch(() => [])
     routes = [...first, ...next]
   }
   return dedupe(routes).sort((a, b) => a.departure - b.departure)
@@ -118,15 +182,15 @@ const nextRide = (pool, ready) =>
 
 // Fixed itinerary through via stops: every segment is looked up on its own and
 // the rides are chained together, so the route always changes where asked.
-async function fetchChained(stopIds, legModes) {
-  const first = await fetchSegment(stopIds[0], stopIds[1], legModes[0])
+async function fetchChained(places, legModes) {
+  const first = await fetchSegment(places[0], places[1], legModes[0])
   let chains = first
     .filter((r) => !r.cancelled)
     .slice(0, MAX_CHAINS)
     .map((r) => [r])
 
-  for (let i = 1; i < stopIds.length - 1 && chains.length; i++) {
-    const [from, to, modes] = [stopIds[i], stopIds[i + 1], legModes[i]]
+  for (let i = 1; i < places.length - 1 && chains.length; i++) {
+    const [from, to, modes] = [places[i], places[i + 1], legModes[i]]
     const earliest = Math.min(...chains.map((c) => c.at(-1).arrival)) + TRANSFER_MS
     const pool = await fetchPage(from, to, modes, new Date(earliest))
 
@@ -167,10 +231,10 @@ async function fetchChained(stopIds, legModes) {
     .sort((a, b) => a.ride.departure - b.ride.departure)
 }
 
-// `stopIds` is origin, optional via stops, destination; `legModes[i]` filters
+// `places` (from resolveStation) is origin, optional via stops, destination; `legModes[i]` filters
 // the transport used between stop i and stop i + 1.
-export async function fetchRoutes(stopIds, legModes) {
-  if (stopIds.length > 2) return fetchChained(stopIds, legModes)
-  const routes = await fetchSegment(stopIds[0], stopIds[1], legModes[0])
+export async function fetchRoutes(places, legModes) {
+  if (places.length > 2) return fetchChained(places, legModes)
+  const routes = await fetchSegment(places[0], places[1], legModes[0])
   return routes.sort((a, b) => a.ride.departure - b.ride.departure)
 }

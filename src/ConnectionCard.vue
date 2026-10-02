@@ -26,7 +26,7 @@ async function addStop() {
   stopError.value = ''
   try {
     const station = await resolveStation(newStop.value)
-    emit('add-stop', station.name)
+    emit('add-stop', station.token)
     newStop.value = ''
     addingStop.value = false
   } catch (e) {
@@ -83,10 +83,7 @@ async function refresh() {
     const resolved = await Promise.all(stopNames.value.map(resolveStation))
     if (current !== request) return
     stations.value = resolved
-    const result = await fetchRoutes(
-      resolved.map((s) => s.id),
-      legModes,
-    )
+    const result = await fetchRoutes(resolved, legModes)
     if (current !== request) return
     routes.value = result
     updatedAt.value = Date.now()

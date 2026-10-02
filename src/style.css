@@ -408,6 +408,29 @@ div.field > span {
   padding-right: 14px;
 }
 
+.add-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px 0;
+}
+
+.add-actions .text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-actions .text svg {
+  width: 18px;
+  height: 18px;
+}
+
+.add-actions .primary {
+  margin: 0;
+}
+
 .primary {
   display: block;
   margin: 6px 14px 0 auto;
