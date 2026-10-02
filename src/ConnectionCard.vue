@@ -45,7 +45,7 @@ function dragEnd(commit) {
   if (commit && from !== over) emit('move-stop', { from, to: over })
 }
 
-// "Done" folds the whole connection into a one-line summary; click it to open it again.
+// The fetched departures can be folded away; the stops and filters stay visible.
 const open = ref(true)
 
 const viaLabel = computed(() =>
@@ -56,14 +56,6 @@ const viaLabel = computed(() =>
         .join(', ')}`
     : '',
 )
-
-const summary = computed(() => {
-  const legs = props.connection.legs
-  const transport = legs.every((l) => !l.modes.length)
-    ? 'Any transport'
-    : legs.map((l) => l.modes.map((m) => MODES[m].label).join('/') || 'Any').join(' › ')
-  return [viaLabel.value, transport].filter(Boolean).join(' · ')
-})
 
 const newStop = ref('')
 const addingStop = ref(false)
@@ -208,15 +200,7 @@ onUnmounted(() => {
       <small v-if="viaLabel" class="via">{{ viaLabel }}</small>
     </h2>
 
-    <button v-if="!display && !open" type="button" class="summary" title="Show connection" @click="open = true">
-      <span class="summary-text">
-        <strong>{{ stopLabel(0) }} → {{ stopLabel(lastStop) }}</strong>
-        <small>{{ summary }}</small>
-      </span>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z" /></svg>
-    </button>
-
-    <div v-if="!display && open" class="directions">
+    <div v-if="!display" class="directions">
       <div class="rail" aria-hidden="true">
         <span class="dot"></span>
         <span class="dots"></span>
@@ -263,7 +247,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="!display && open" class="legs-config">
+    <div v-if="!display" class="legs-config">
       <div v-for="(leg, l) in connection.legs" :key="l" class="chips">
         <span v-if="connection.legs.length > 1" class="chips-label">to {{ stopLabel(l + 1) }}</span>
         <button
@@ -286,7 +270,9 @@ onUnmounted(() => {
       </form>
       <div v-else class="config-actions">
         <button type="button" class="text" @click="addingStop = true">+ Add a stop to change at</button>
-        <button type="button" class="text" @click="open = false">Done</button>
+        <button type="button" class="text" :aria-expanded="open" @click="open = !open">
+          {{ open ? 'Hide departures' : 'Show departures' }}
+        </button>
       </div>
       <p v-if="stopError" class="notice bad">{{ stopError }}</p>
     </div>
