@@ -525,6 +525,7 @@ html.display body {
   flex: none;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 0 0.5vmin;
   color: var(--muted);
   font-size: 2.6vmin;
@@ -533,6 +534,8 @@ html.display body {
 }
 
 .board-bar .clock {
+  font-size: 6vmin;
+  line-height: 1;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
@@ -568,15 +571,21 @@ html.display body {
 .board .title {
   flex: none;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0.5em 0.9em;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--board-title);
+  font-weight: 500;
+  overflow: hidden;
+}
+
+.board .title-text {
+  display: inline-flex;
   align-items: center;
   gap: 0.4em;
-  margin: 0;
-  padding: 0.6em 0.9em;
-  border-bottom: 1px solid var(--border);
-  font-size: calc(var(--board-font) * 0.85);
-  font-weight: 500;
   white-space: nowrap;
-  overflow: hidden;
 }
 
 .board svg {
@@ -604,6 +613,7 @@ html.display body {
   column-gap: 0.9em;
   row-gap: 0.25em;
   padding: 0 0.9em;
+  border-bottom-color: color-mix(in srgb, var(--border) 30%, transparent);
   overflow: hidden;
 }
 
@@ -631,6 +641,8 @@ html.display body {
 
 .board .duration {
   grid-area: duration;
+  justify-self: end;
+  text-align: right;
   font-size: 1em;
   color: var(--muted);
 }
@@ -651,6 +663,8 @@ html.display body {
 
 .board .countdown {
   grid-area: countdown;
+  justify-self: end;
+  text-align: right;
   font-size: 1.45em;
 }
 
@@ -675,9 +689,11 @@ html.display body {
 }
 
 .board .title .via {
+  max-width: 100%;
   color: var(--muted);
-  font-size: 0.75em;
+  font-size: 0.55em;
   font-weight: 400;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }

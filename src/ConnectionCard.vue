@@ -88,7 +88,10 @@ const MIN_BOARD_FONT = 12
 
 const cardEl = ref(null)
 const titleEl = ref(null)
-const board = ref({ font: 26, rows: 3 })
+const titleTextEl = ref(null)
+const board = ref({ font: 26, title: 31, rows: 3 })
+const TITLE_SCALE = 1.2
+const TITLE_PADDING_EM = 1.8 // left + right padding of .title
 
 function fitBoard() {
   const card = cardEl.value
@@ -102,11 +105,27 @@ function fitBoard() {
     rows = Math.round(space / (font * ROW_HEIGHT_EM))
   }
   rows = Math.min(MAX_BOARD_ROWS, Math.max(1, rows))
-  if (font !== board.value.font || rows !== board.value.rows) board.value = { font, rows }
+
+  // The title is larger than the rows, but shrinks so "from → to" always fits on one line.
+  let title = font * TITLE_SCALE
+  const text = titleTextEl.value
+  if (text?.offsetWidth) {
+    const emWidth = text.offsetWidth / parseFloat(getComputedStyle(text).fontSize)
+    title = Math.min(title, card.clientWidth / (emWidth + TITLE_PADDING_EM))
+  }
+  title = Math.round(title * 10) / 10
+  const next = { font, title, rows }
+  if (Object.keys(next).some((k) => next[k] !== board.value[k])) board.value = next
 }
 
 const boardStyle = computed(() =>
-  props.display ? { '--board-font': `${board.value.font}px`, '--board-rows': board.value.rows } : null,
+  props.display
+    ? {
+        '--board-font': `${board.value.font}px`,
+        '--board-title': `${board.value.title}px`,
+        '--board-rows': board.value.rows,
+      }
+    : null,
 )
 
 const maxRoutes = computed(() => (props.display ? board.value.rows : 5))
@@ -182,6 +201,8 @@ onMounted(() => {
   if (props.display) {
     resizeObserver = new ResizeObserver(fitBoard)
     resizeObserver.observe(cardEl.value)
+    resizeObserver.observe(titleEl.value) // its height follows the font size
+    resizeObserver.observe(titleTextEl.value) // its width follows the stop names
     fitBoard()
   }
 })
@@ -194,9 +215,11 @@ onUnmounted(() => {
 <template>
   <section ref="cardEl" class="card" :style="boardStyle">
     <h2 v-if="display" ref="titleEl" class="title">
-      {{ stopLabel(0) }}
-      <svg viewBox="0 0 24 24" aria-label="to"><path d="m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z" /></svg>
-      {{ stopLabel(lastStop) }}
+      <span ref="titleTextEl" class="title-text">
+        {{ stopLabel(0) }}
+        <svg viewBox="0 0 24 24" aria-label="to"><path d="m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z" /></svg>
+        {{ stopLabel(lastStop) }}
+      </span>
       <small v-if="viaLabel" class="via">{{ viaLabel }}</small>
     </h2>
 
