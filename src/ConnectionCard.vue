@@ -45,6 +45,26 @@ function dragEnd(commit) {
   if (commit && from !== over) emit('move-stop', { from, to: over })
 }
 
+// "Done" folds the editing controls into a one-line summary; click it to edit again.
+const open = ref(true)
+
+const viaLabel = computed(() =>
+  lastStop.value > 1
+    ? `via ${stopNames.value
+        .slice(1, -1)
+        .map((_, i) => stopLabel(i + 1))
+        .join(', ')}`
+    : '',
+)
+
+const summary = computed(() => {
+  const legs = props.connection.legs
+  const transport = legs.every((l) => !l.modes.length)
+    ? 'Any transport'
+    : legs.map((l) => l.modes.map((m) => MODES[m].label).join('/') || 'Any').join(' › ')
+  return [viaLabel.value, transport].filter(Boolean).join(' · ')
+})
+
 const newStop = ref('')
 const addingStop = ref(false)
 const stopError = ref('')
@@ -185,10 +205,18 @@ onUnmounted(() => {
       {{ stopLabel(0) }}
       <svg viewBox="0 0 24 24" aria-label="to"><path d="m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z" /></svg>
       {{ stopLabel(lastStop) }}
-      <small v-if="lastStop > 1" class="via">via {{ stopNames.slice(1, -1).map((_, i) => stopLabel(i + 1)).join(', ') }}</small>
+      <small v-if="viaLabel" class="via">{{ viaLabel }}</small>
     </h2>
 
-    <div v-if="!display" class="directions">
+    <button v-if="!display && !open" type="button" class="summary" title="Edit connection" @click="open = true">
+      <span class="summary-text">
+        <strong>{{ stopLabel(0) }} → {{ stopLabel(lastStop) }}</strong>
+        <small>{{ summary }}</small>
+      </span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41Z" /></svg>
+    </button>
+
+    <div v-if="!display && open" class="directions">
       <div class="rail" aria-hidden="true">
         <span class="dot"></span>
         <span class="dots"></span>
@@ -235,7 +263,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="!display" class="legs-config">
+    <div v-if="!display && open" class="legs-config">
       <div v-for="(leg, l) in connection.legs" :key="l" class="chips">
         <span v-if="connection.legs.length > 1" class="chips-label">to {{ stopLabel(l + 1) }}</span>
         <button
@@ -256,7 +284,10 @@ onUnmounted(() => {
         <button type="submit" class="text">Add</button>
         <button type="button" class="text muted" @click="addingStop = false">Cancel</button>
       </form>
-      <button v-else type="button" class="text" @click="addingStop = true">+ Add a stop to change at</button>
+      <div v-else class="config-actions">
+        <button type="button" class="text" @click="addingStop = true">+ Add a stop to change at</button>
+        <button type="button" class="text" @click="open = false">Done</button>
+      </div>
       <p v-if="stopError" class="notice bad">{{ stopError }}</p>
     </div>
 
