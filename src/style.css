@@ -159,6 +159,7 @@ button {
 /* Mode filter */
 .legs-config {
   padding: 4px 14px 10px;
+  border-bottom: 1px solid var(--border);
 }
 
 .chips {
@@ -679,119 +680,4 @@ html.display body {
   font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Editing page: accordion cards, and a right-hand departures panel in landscape */
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 12px 14px 12px 10px;
-  border: 0;
-  background: none;
-  color: var(--text);
-  text-align: left;
-}
-
-.summary:hover {
-  background: var(--field);
-}
-
-.caret {
-  color: var(--muted);
-  transition: transform 0.15s;
-}
-
-.summary[aria-expanded='true'] .caret {
-  transform: rotate(90deg);
-}
-
-.summary-text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.summary-text strong {
-  font-weight: 500;
-  font-size: 15px;
-}
-
-.summary-text small {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.summary-text strong,
-.summary-text small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.config {
-  border-top: 1px solid var(--border);
-}
-
-.result:not(.card) {
-  border-top: 1px solid var(--border);
-}
-
-.result .routes li:last-child {
-  border-bottom: 0;
-}
-
-.result .updated {
-  border-top: 1px solid var(--border);
-}
-
-.result-title {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.result-title small {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 16px;
-}
-
-main.split {
-  max-width: 1400px;
-  flex-direction: row;
-  align-items: flex-start;
-  padding: 16px;
-}
-
-main.split .sidebar {
-  flex: 0 0 380px;
-  min-width: 0;
-}
-
-.results {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  align-items: start;
-  gap: 16px;
-}
-
-/* On the TV board the wrapper must not get in the way of the card layout. */
-.board .result {
-  display: contents;
 }
