@@ -37,7 +37,7 @@ Without parameters the page shows buses from Gertrud-Grunow-Straße to Alte Heid
 
 ## TV display mode
 
-Add `&display=1` to the URL, or use the **Copy display link** button, to get a read-only board: the stop inputs, filters and add form are hidden, and the next three departures per connection are shown in large text, laid out to fill the screen without scrolling. Remove `display=1` to edit again.
+Add `&display=1` to the URL, or use the **Copy display link** button, to get a read-only board: the stop inputs, filters and add form are hidden, and each connection shows as many upcoming departures as fit the screen (more on larger resolutions, up to eight) in large text, without scrolling. Remove `display=1` to edit again.
 
 ## Run
 

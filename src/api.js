@@ -172,7 +172,7 @@ async function fetchSegment(origin, destination, modes, from = new Date()) {
 
 // Time allowed for changing vehicles at a via stop.
 const TRANSFER_MS = 2 * 60_000
-const MAX_CHAINS = 6
+const MAX_CHAINS = 10
 
 // Earliest-arriving ride in `pool` that can still be caught at `ready`.
 const nextRide = (pool, ready) =>

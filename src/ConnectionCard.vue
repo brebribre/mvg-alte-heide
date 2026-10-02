@@ -67,8 +67,37 @@ const error = ref('')
 const loading = ref(true)
 const updatedAt = ref(null)
 
-// The TV board shows fewer, larger rows.
-const maxRoutes = computed(() => (props.display ? 3 : 5))
+// On the TV board the text size follows the card width (capped so it stays
+// readable from a distance) and as many rows are shown as fit the card height.
+const ROW_HEIGHT_EM = 5.8
+const MIN_BOARD_ROWS = 3
+const MAX_BOARD_ROWS = 8
+const MIN_BOARD_FONT = 12
+
+const cardEl = ref(null)
+const titleEl = ref(null)
+const board = ref({ font: 26, rows: 3 })
+
+function fitBoard() {
+  const card = cardEl.value
+  if (!card) return
+  const space = card.clientHeight - (titleEl.value?.offsetHeight ?? 0)
+  let font = Math.min(card.clientWidth * 0.046, Math.max(26, window.innerHeight * 0.024))
+  let rows = Math.floor(space / (font * ROW_HEIGHT_EM))
+  // Short cards (many connections on screen) shrink the text rather than drop below a few rows.
+  if (rows < MIN_BOARD_ROWS) {
+    font = Math.max(MIN_BOARD_FONT, space / (MIN_BOARD_ROWS * ROW_HEIGHT_EM))
+    rows = Math.round(space / (font * ROW_HEIGHT_EM))
+  }
+  rows = Math.min(MAX_BOARD_ROWS, Math.max(1, rows))
+  if (font !== board.value.font || rows !== board.value.rows) board.value = { font, rows }
+}
+
+const boardStyle = computed(() =>
+  props.display ? { '--board-font': `${board.value.font}px`, '--board-rows': board.value.rows } : null,
+)
+
+const maxRoutes = computed(() => (props.display ? board.value.rows : 5))
 
 const upcoming = computed(() =>
   routes.value.filter((r) => r.ride.departure > props.now - 30_000).slice(0, maxRoutes.value),
@@ -134,17 +163,25 @@ watch(
   },
 )
 
-let timer
+let timer, resizeObserver
 onMounted(() => {
   refresh()
   timer = setInterval(refresh, REFRESH_MS)
+  if (props.display) {
+    resizeObserver = new ResizeObserver(fitBoard)
+    resizeObserver.observe(cardEl.value)
+    fitBoard()
+  }
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  clearInterval(timer)
+  resizeObserver?.disconnect()
+})
 </script>
 
 <template>
-  <section class="card">
-    <h2 v-if="display" class="title">
+  <section ref="cardEl" class="card" :style="boardStyle">
+    <h2 v-if="display" ref="titleEl" class="title">
       {{ stopLabel(0) }}
       <svg viewBox="0 0 24 24" aria-label="to"><path d="m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z" /></svg>
       {{ stopLabel(lastStop) }}
