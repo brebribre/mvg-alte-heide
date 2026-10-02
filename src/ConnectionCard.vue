@@ -18,10 +18,11 @@ const error = ref('')
 const loading = ref(true)
 const updatedAt = ref(null)
 
-const MAX_ROUTES = 5
+// The TV board shows fewer, larger rows.
+const maxRoutes = computed(() => (props.display ? 3 : 5))
 
 const upcoming = computed(() =>
-  routes.value.filter((r) => r.ride.departure > props.now - 30_000).slice(0, MAX_ROUTES),
+  routes.value.filter((r) => r.ride.departure > props.now - 30_000).slice(0, maxRoutes.value),
 )
 
 const time = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
