@@ -47,6 +47,8 @@ Add `&display=1` to the URL, or use the **Copy display link** button, to get a r
 
 By default the board decides how many connections go side by side. Add `&cols=1` or `&cols=2` (or pick it under **Connections per row on the TV** before copying the link) to force one or two per row. With one per row, each departure is laid out on a single line across the full width.
 
+The header shows the weather in Munich from [Open-Meteo](https://open-meteo.com): the current temperature, the rain chance for this hour and an icon for the sky. Add `&weather=<lat>,<lng>` for another place.
+
 Add `&debug=1` to see sizes, timings and script errors in a box on the page, for a player whose WebView has no DevTools.
 
 The board is made for signage players that reload the page every few seconds. The frame (header, clock, one card per connection with its stops) is drawn before any data arrives, and each card remembers its last departures on the device, so a reload shows the previous board at once and swaps in fresh data as it comes; the time it was fetched is shown under each card. When a refresh fails or times out the previous departures stay, marked "could not refresh". Nothing on the board depends on Google Fonts or on the device's location.
@@ -62,6 +64,6 @@ npm run dev
 
 ## Data
 
-The page calls the unofficial MVG API (`https://www.mvg.de/api/bgw-pt/v3`) straight from the browser; no key or backend is needed. It uses `/routes` for connections and `/locations` or `/stations/<id>` to resolve stops.
+The page calls the unofficial MVG API (`https://www.mvg.de/api/bgw-pt/v3`) straight from the browser; no key or backend is needed. It uses `/routes` for connections and `/locations` or `/stations/<id>` to resolve stops. The board's weather comes from the free Open-Meteo API, also without a key.
 
 The API is undocumented and may change without notice. MVG only permits private, non-commercial use. This project is not affiliated with MVG or Google.

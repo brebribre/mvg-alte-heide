@@ -6,6 +6,7 @@
 //   &display=1                                 read-only fullscreen board
 //   &cols=1|2                                  connections per row on the board
 //   &theme=light|dark                          colours, instead of the system setting
+//   &weather=<lat>,<lng>                       where the board's weather is for (default: Munich)
 // Stops are station names, MVG global IDs (de:09162:530), `here` for the
 // device's current location, or fixed coordinates (48.18372,11.59668).
 // The older form ?c=<from>~<to>~bus,tram is still read.
@@ -76,6 +77,14 @@ const colsQuery = (cols) => (cols ? `&cols=${cols}` : '')
 export function writeConnections(connections, cols) {
   const query = toQuery(connections) + (connections.length ? colsQuery(cols) : '')
   history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}`)
+}
+
+// Where the weather in the board header is for; Munich unless `weather=lat,lng` says otherwise.
+const MUNICH = { lat: 48.137, lng: 11.575 }
+
+export function readWeatherPlace() {
+  const m = (new URLSearchParams(location.search).get('weather') ?? '').match(/^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/)
+  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : MUNICH
 }
 
 // `display=1` turns the page into a read-only, non-scrolling board (for a TV).

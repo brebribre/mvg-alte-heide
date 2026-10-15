@@ -1,12 +1,14 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConnectionCard from './ConnectionCard.vue'
+import WeatherBadge from './WeatherBadge.vue'
 import { resolveStation } from './api'
-import { displayUrl, isDisplay, readCols, readConnections, writeConnections } from './url'
+import { displayUrl, isDisplay, readCols, readConnections, readWeatherPlace, writeConnections } from './url'
 
 const connections = ref(readConnections())
 const now = ref(Date.now())
 const display = isDisplay()
+const weatherPlace = readWeatherPlace()
 const copied = ref(false)
 const copyError = ref('')
 
@@ -164,7 +166,7 @@ onUnmounted(() => {
   <pre v-if="debug" class="debug">{{ debugInfo }}</pre>
   <main v-if="display" class="board" :class="{ 'fixed-cols': cols }" :style="{ '--cols': gridCols, '--rows': gridRows }">
     <header class="board-bar">
-      <span>Departures</span>
+      <WeatherBadge :lat="weatherPlace.lat" :lng="weatherPlace.lng" />
       <span class="clock">{{ clock.format(now) }}</span>
     </header>
     <div class="board-grid">

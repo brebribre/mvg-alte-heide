@@ -548,6 +548,33 @@ html.display body {
   font-weight: 500;
 }
 
+/* Weather in place of the "Departures" word: icon, temperature, rain chance */
+.weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.weather svg {
+  width: 1.7em;
+  height: 1.7em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--text);
+}
+
+.weather .temp {
+  color: var(--text);
+  font-size: 1.5em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 .board-bar .clock {
   font-size: 6cqmin;
   line-height: 1;

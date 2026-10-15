@@ -14,19 +14,21 @@ export const MODES = {
   bahn: { label: 'Train', types: ['BAHN'] },
 }
 
-async function getJson(path, params) {
-  const query = params ? `?${new URLSearchParams(params)}` : ''
+// JSON over HTTPS with a timeout; `who` names the service in error messages.
+export async function fetchJson(url, who = 'MVG') {
   const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined
   let res
   try {
-    res = await fetch(`${BASE}${path}${query}`, { signal })
+    res = await fetch(url, { signal })
   } catch (e) {
     const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError'
-    throw new Error(timedOut ? 'MVG did not answer in time' : 'Could not reach MVG')
+    throw new Error(timedOut ? `${who} did not answer in time` : `Could not reach ${who}`)
   }
-  if (!res.ok) throw new Error(`MVG API responded with ${res.status}`)
+  if (!res.ok) throw new Error(`${who} API responded with ${res.status}`)
   return res.json()
 }
+
+const getJson = (path, params) => fetchJson(`${BASE}${path}${params ? `?${new URLSearchParams(params)}` : ''}`)
 
 export const HERE = 'here'
 const COORDS = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/
