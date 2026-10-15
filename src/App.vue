@@ -103,6 +103,19 @@ const debugInfo = ref('')
 const debugErrors = []
 let mountedAt = 0
 
+// TEMPORARY probe: what 100vh, 100vmin, 100dvh and a 100% height resolve to here.
+function unitProbe() {
+  const out = []
+  for (const h of ['100vh', '100vmin', '100dvh', '100%']) {
+    const el = document.createElement('div')
+    el.style.cssText = `position:absolute;visibility:hidden;height:${h}`
+    document.body.append(el)
+    out.push(`${h}=${el.offsetHeight}`)
+    el.remove()
+  }
+  return out.join(' ')
+}
+
 function collectDebug() {
   const q = (sel) => document.querySelector(sel)
   const size = (el) => (el ? `${el.clientWidth}×${el.clientHeight}` : '-')
@@ -120,7 +133,7 @@ function collectDebug() {
     `visualViewport ${vv ? `${Math.round(vv.width)}×${Math.round(vv.height)} scale ${vv.scale.toFixed(3)} offset ${Math.round(vv.offsetLeft)},${Math.round(vv.offsetTop)}` : '-'} · scroll ${scrollX},${scrollY}`,
     `html ${size(document.documentElement)} (${getComputedStyle(document.documentElement).height}) body ${size(document.body)} app ${size(q('#app'))} board ${size(q('.board'))} card ${size(card)}`,
     `rects board ${rect(q('.board'))} · card ${rect(card)} · title ${rect(q('.title'))}`,
-    `board font ${style?.getPropertyValue('--board-font') || '-'} rows ${style?.getPropertyValue('--board-rows') || '-'} · fonts ${document.fonts?.status} · routes ${document.querySelectorAll('.routes li').length}`,
+    `units ${unitProbe()} · board font ${style?.getPropertyValue('--board-font') || '-'} rows ${style?.getPropertyValue('--board-rows') || '-'} · fonts ${document.fonts?.status} · routes ${document.querySelectorAll('.routes li').length}`,
     ...debugErrors,
   ].join('\n')
 }

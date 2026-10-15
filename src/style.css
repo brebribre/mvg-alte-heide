@@ -515,22 +515,25 @@ div.field .name {
   margin: 0;
 }
 
-/* Display board (?display=1): fills the screen, never scrolls. The height is
-   passed down from <html> in percent rather than taken from dvh: a WebView in
-   a signage player sizes its view after the page has started loading, and
-   viewport units there are not something to depend on. */
+/* Display board (?display=1): fills the screen, never scrolls. It is pinned
+   to the viewport rather than given a height: in the WebView of a signage
+   player (Android, wide viewport mode) a percentage height on <html> and the
+   dvh unit both come out as 0, so the whole board was clipped to nothing,
+   while fixed positioning fills the view. Sizes inside use container units
+   for the same reason. */
 html.display,
-html.display body,
-html.display #app {
+html.display body {
   height: 100%;
   overflow: hidden;
 }
 
 .board {
+  position: fixed;
+  inset: 0;
+  container-type: size;
   max-width: none;
-  height: 100%;
-  padding: 1.5vmin;
-  gap: 1.5vmin;
+  padding: 1.5cqmin;
+  gap: 1.5cqmin;
 }
 
 .board-bar {
@@ -538,15 +541,15 @@ html.display #app {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 0.5vmin;
+  padding: 0 0.5cqmin;
   color: var(--muted);
-  font-size: 2.6vmin;
+  font-size: 2.6cqmin;
   line-height: 1.2;
   font-weight: 500;
 }
 
 .board-bar .clock {
-  font-size: 6vmin;
+  font-size: 6cqmin;
   line-height: 1;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -558,7 +561,7 @@ html.display #app {
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
   grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
-  gap: 1.5vmin;
+  gap: 1.5cqmin;
 }
 
 /* The automatic layout turns on its side in portrait; a chosen `cols` is kept. */
