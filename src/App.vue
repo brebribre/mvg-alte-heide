@@ -124,6 +124,7 @@ if (debug) {
 // The `display` class on <html> is set by the inline script in index.html, before the first paint.
 let ticker, debugTicker
 onMounted(() => {
+  document.documentElement.dataset.ready = ''
   ticker = setInterval(() => (now.value = Date.now()), 5_000)
   if (debug) {
     mountedAt = Math.round(performance.now())
