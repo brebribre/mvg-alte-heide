@@ -97,13 +97,13 @@ async function add() {
 
 // ?debug=1 prints sizes, timings and script errors on the page itself, for a
 // TV box whose WebView has no DevTools and no console.
-// TEMPORARY: also on inside an Android app WebView, while a signage player's blank board is traced.
-const debug = new URLSearchParams(location.search).has('debug') || /\bwv\b/.test(navigator.userAgent)
+const debug = new URLSearchParams(location.search).has('debug')
 const debugInfo = ref('')
 const debugErrors = []
 let mountedAt = 0
 
-// TEMPORARY probe: what 100vh, 100vmin, 100dvh and a 100% height resolve to here.
+// What 100vh, 100vmin, 100dvh and a 100% height resolve to: a signage player's
+// WebView can make all of them 0 (see .board in style.css).
 function unitProbe() {
   const out = []
   for (const h of ['100vh', '100vmin', '100dvh', '100%']) {
