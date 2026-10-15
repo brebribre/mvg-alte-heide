@@ -97,7 +97,8 @@ async function add() {
 
 // ?debug=1 prints sizes, timings and script errors on the page itself, for a
 // TV box whose WebView has no DevTools and no console.
-const debug = new URLSearchParams(location.search).has('debug')
+// TEMPORARY: also on inside an Android app WebView, while a signage player's blank board is traced.
+const debug = new URLSearchParams(location.search).has('debug') || /\bwv\b/.test(navigator.userAgent)
 const debugInfo = ref('')
 const debugErrors = []
 let mountedAt = 0
@@ -107,10 +108,18 @@ function collectDebug() {
   const size = (el) => (el ? `${el.clientWidth}×${el.clientHeight}` : '-')
   const card = q('.card')
   const style = card && getComputedStyle(card)
+  const rect = (el) => {
+    if (!el) return '-'
+    const r = el.getBoundingClientRect()
+    return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}×${Math.round(r.height)}`
+  }
+  const vv = visualViewport
   debugInfo.value = [
     navigator.userAgent,
-    `window ${innerWidth}×${innerHeight} dpr ${devicePixelRatio} · mounted ${mountedAt} ms · now ${Math.round(performance.now())} ms`,
-    `html ${size(document.documentElement)} body ${size(document.body)} app ${size(q('#app'))} board ${size(q('.board'))} card ${size(card)}`,
+    `window ${innerWidth}×${innerHeight} dpr ${devicePixelRatio} screen ${screen.width}×${screen.height} · mounted ${mountedAt} ms · now ${Math.round(performance.now())} ms`,
+    `visualViewport ${vv ? `${Math.round(vv.width)}×${Math.round(vv.height)} scale ${vv.scale.toFixed(3)} offset ${Math.round(vv.offsetLeft)},${Math.round(vv.offsetTop)}` : '-'} · scroll ${scrollX},${scrollY}`,
+    `html ${size(document.documentElement)} (${getComputedStyle(document.documentElement).height}) body ${size(document.body)} app ${size(q('#app'))} board ${size(q('.board'))} card ${size(card)}`,
+    `rects board ${rect(q('.board'))} · card ${rect(card)} · title ${rect(q('.title'))}`,
     `board font ${style?.getPropertyValue('--board-font') || '-'} rows ${style?.getPropertyValue('--board-rows') || '-'} · fonts ${document.fonts?.status} · routes ${document.querySelectorAll('.routes li').length}`,
     ...debugErrors,
   ].join('\n')
