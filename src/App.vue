@@ -95,15 +95,50 @@ async function add() {
   }
 }
 
+// ?debug=1 prints sizes, timings and script errors on the page itself, for a
+// TV box whose WebView has no DevTools and no console.
+const debug = new URLSearchParams(location.search).has('debug')
+const debugInfo = ref('')
+const debugErrors = []
+let mountedAt = 0
+
+function collectDebug() {
+  const q = (sel) => document.querySelector(sel)
+  const size = (el) => (el ? `${el.clientWidth}×${el.clientHeight}` : '-')
+  const card = q('.card')
+  const style = card && getComputedStyle(card)
+  debugInfo.value = [
+    navigator.userAgent,
+    `window ${innerWidth}×${innerHeight} dpr ${devicePixelRatio} · mounted ${mountedAt} ms · now ${Math.round(performance.now())} ms`,
+    `html ${size(document.documentElement)} body ${size(document.body)} app ${size(q('#app'))} board ${size(q('.board'))} card ${size(card)}`,
+    `board font ${style?.getPropertyValue('--board-font') || '-'} rows ${style?.getPropertyValue('--board-rows') || '-'} · fonts ${document.fonts?.status} · routes ${document.querySelectorAll('.routes li').length}`,
+    ...debugErrors,
+  ].join('\n')
+}
+
+if (debug) {
+  addEventListener('error', (e) => debugErrors.push(`error: ${e.message}`))
+  addEventListener('unhandledrejection', (e) => debugErrors.push(`rejected: ${e.reason?.message ?? e.reason}`))
+}
+
 // The `display` class on <html> is set by the inline script in index.html, before the first paint.
-let ticker
+let ticker, debugTicker
 onMounted(() => {
   ticker = setInterval(() => (now.value = Date.now()), 5_000)
+  if (debug) {
+    mountedAt = Math.round(performance.now())
+    collectDebug()
+    debugTicker = setInterval(collectDebug, 1_000)
+  }
 })
-onUnmounted(() => clearInterval(ticker))
+onUnmounted(() => {
+  clearInterval(ticker)
+  clearInterval(debugTicker)
+})
 </script>
 
 <template>
+  <pre v-if="debug" class="debug">{{ debugInfo }}</pre>
   <main v-if="display" class="board" :class="{ 'fixed-cols': cols }" :style="{ '--cols': gridCols, '--rows': gridRows }">
     <header class="board-bar">
       <span>Departures</span>

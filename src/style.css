@@ -509,16 +509,20 @@ div.field .name {
   margin: 0;
 }
 
-/* Display board (?display=1): fills the screen, never scrolls */
+/* Display board (?display=1): fills the screen, never scrolls. The height is
+   passed down from <html> in percent rather than taken from dvh: a WebView in
+   a signage player sizes its view after the page has started loading, and
+   viewport units there are not something to depend on. */
 html.display,
-html.display body {
+html.display body,
+html.display #app {
   height: 100%;
   overflow: hidden;
 }
 
 .board {
   max-width: none;
-  height: 100dvh;
+  height: 100%;
   padding: 1.5vmin;
   gap: 1.5vmin;
 }
@@ -741,6 +745,22 @@ html.display body {
 .segmented button.active {
   background: var(--blue-soft);
   color: var(--blue);
+}
+
+/* ?debug=1: sizes, timings and errors on screen, for a TV box without DevTools */
+.debug {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 9;
+  max-width: calc(100vw - 16px);
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font: 14px/1.35 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
 }
 
 /* Wide board cards: one line per departure */

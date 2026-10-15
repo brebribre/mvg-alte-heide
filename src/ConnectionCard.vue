@@ -104,7 +104,10 @@ const TITLE_PADDING_EM = 1.8 // left + right padding of .title
 
 function fitBoard() {
   const card = cardEl.value
-  if (!card) return
+  // A card that has no size yet (the WebView of a signage player lays the page
+  // out before the view is sized) would make every size 0 or NaN; the observer
+  // calls again once there is something to measure.
+  if (!card || !card.clientWidth || !card.clientHeight) return
   const space = card.clientHeight - (titleEl.value?.offsetHeight ?? 0) - (footerEl.value?.offsetHeight ?? 0)
   let font = Math.min(card.clientWidth * 0.046, Math.max(26, window.innerHeight * 0.024))
   const wide = card.clientWidth / font >= WIDE_MIN_WIDTH_EM
@@ -115,7 +118,8 @@ function fitBoard() {
     font = Math.max(MIN_BOARD_FONT, space / (MIN_BOARD_ROWS * rowEm))
     rows = Math.round(space / (font * rowEm))
   }
-  rows = Math.min(MAX_BOARD_ROWS, Math.max(1, rows))
+  rows = Math.min(MAX_BOARD_ROWS, Math.max(1, rows || 1))
+  font = Math.max(MIN_BOARD_FONT, font)
 
   // The title is larger than the rows, but shrinks so "from → to" always fits on one line.
   let title = font * TITLE_SCALE
