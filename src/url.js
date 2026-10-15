@@ -5,9 +5,12 @@
 //   ?c=<from>~bus@<via>~ubahn@<via>~sbahn@<to> fixed route through via stops
 //   &display=1                                 read-only fullscreen board
 //   &cols=1|2                                  connections per row on the board
+//   &theme=light|dark                          colours, instead of the system setting
 // Stops are station names, MVG global IDs (de:09162:530), `here` for the
 // device's current location, or fixed coordinates (48.18372,11.59668).
 // The older form ?c=<from>~<to>~bus,tram is still read.
+// The theme and display flags are read before the first paint by the inline
+// script in index.html; this module only writes the URL.
 import { HERE, MODES, currentPosition } from './api'
 
 // A connection is { from, legs: [{ to, modes }] }; every leg but the last ends at a via stop.
@@ -48,14 +51,15 @@ export function readConnections() {
   return parsed.length ? parsed : structuredClone(DEFAULT)
 }
 
+const modesPrefix = (leg) => (leg.modes.length ? `${leg.modes.join(',')}@` : '')
+
+// One connection as written in the URL (not encoded); also the key under which
+// its last results are remembered.
+export const connectionKey = (c) => [c.from, ...c.legs.map((l) => modesPrefix(l) + l.to)].join('~')
+
 function toQuery(connections) {
   return connections
-    .map((c) =>
-      [
-        encodeURIComponent(c.from),
-        ...c.legs.map((l) => (l.modes.length ? `${l.modes.join(',')}@` : '') + encodeURIComponent(l.to)),
-      ].join('~'),
-    )
+    .map((c) => [encodeURIComponent(c.from), ...c.legs.map((l) => modesPrefix(l) + encodeURIComponent(l.to))].join('~'))
     .map((value) => `c=${value}`)
     .join('&')
 }

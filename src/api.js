@@ -1,5 +1,9 @@
 // Unofficial MVG API (the one mvg.de itself uses). No key needed, CORS is open.
+import { load, save } from './storage'
+
 const BASE = 'https://www.mvg.de/api/bgw-pt/v3'
+// A board that reloads every few seconds must not pile up hanging requests.
+const TIMEOUT_MS = 12_000
 
 // URL name -> MVG transport types
 export const MODES = {
@@ -12,18 +16,28 @@ export const MODES = {
 
 async function getJson(path, params) {
   const query = params ? `?${new URLSearchParams(params)}` : ''
-  const res = await fetch(`${BASE}${path}${query}`)
+  const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined
+  let res
+  try {
+    res = await fetch(`${BASE}${path}${query}`, { signal })
+  } catch (e) {
+    const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError'
+    throw new Error(timedOut ? 'MVG did not answer in time' : 'Could not reach MVG')
+  }
   if (!res.ok) throw new Error(`MVG API responded with ${res.status}`)
   return res.json()
 }
 
 export const HERE = 'here'
 const COORDS = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/
+const STATION_ID = /^de:\d+:\d+$/i
 const POSITION_TTL_MS = 2 * 60_000
 
 let position = null
 
 // The device's location, asked for once and reused for a couple of minutes.
+// Only a stop written as "here" ever gets here; a board with stops from the
+// URL never touches geolocation.
 export function currentPosition() {
   if (position && Date.now() - position.at < POSITION_TTL_MS) return position.promise
   const promise = new Promise((resolve, reject) => {
@@ -39,39 +53,61 @@ export function currentPosition() {
   return promise
 }
 
-const stationCache = new Map()
+// Lookups are remembered in localStorage across reloads (a station's global ID
+// never changes, so a name only has to be resolved once per device) and shared
+// in memory while in flight, so two cards asking for the same stop send one request.
+const inflight = new Map()
 
-function lookup(query) {
-  const key = query.trim().toLowerCase()
-  if (!stationCache.has(key)) {
-    const result = getJson('/locations', { query: query.trim() }).then((hits) => {
-      const station = hits.find((h) => h.type === 'STATION')
-      if (!station) throw new Error(`No station found for "${query}"`)
-      return station
+function memo(key, fetcher) {
+  const stored = load(key)
+  if (stored) return Promise.resolve(stored)
+  if (!inflight.has(key)) {
+    const result = fetcher().then((value) => {
+      save(key, value)
+      return value
     })
-    result.catch(() => stationCache.delete(key))
-    stationCache.set(key, result)
+    result.catch(() => inflight.delete(key))
+    inflight.set(key, result)
   }
-  return stationCache.get(key)
+  return inflight.get(key)
 }
 
-function nearestStationName(lat, lng) {
-  const key = `near:${lat},${lng}`
-  if (!stationCache.has(key)) {
-    stationCache.set(
-      key,
-      getJson('/stations/nearby', { latitude: lat, longitude: lng })
-        .then((stations) => stations[0]?.name ?? null)
-        .catch(() => null),
-    )
-  }
-  return stationCache.get(key)
-}
+const stationKey = (text) => `station:${text.trim().toLowerCase()}`
+
+const byName = (query) =>
+  memo(stationKey(query), async () => {
+    const hits = await getJson('/locations', { query: query.trim() })
+    const station = Array.isArray(hits) ? hits.find((h) => h.type === 'STATION') : null
+    if (!station) throw new Error(`No station found for "${query.trim()}"`)
+    const entry = { id: station.globalId, name: station.name }
+    save(stationKey(entry.id), entry) // the ID form of the same stop is known now too
+    return entry
+  })
+
+const byId = (id) =>
+  memo(stationKey(id), async () => {
+    const s = await getJson(`/stations/${id}`)
+    return { id: s.globalId, name: s.name }
+  })
+
+const nearKey = (lat, lng) => `near:${lat},${lng}`
+
+const nearestStation = (lat, lng) =>
+  memo(nearKey(lat, lng), async () => {
+    const stations = await getJson('/stations/nearby', { latitude: lat, longitude: lng })
+    const name = stations[0]?.name
+    if (!name) throw new Error('No station nearby')
+    return { name }
+  })
+
+const nearLabel = (near) => (near ? `Near ${near.name}` : 'Saved location')
 
 // Turns what is written in the URL into a routable place. Accepts a station
 // name ("Alte Heide"), a global ID ("de:09162:530"), "here" for the device's
 // current location, or fixed coordinates ("48.18372,11.59668").
 // `token` is how the place is written back to the URL.
+// An ID or coordinates are routable at once and never wait for the network;
+// their `name` is null until `placeName` has looked it up (or remembered it).
 export async function resolveStation(query) {
   const text = query.trim()
 
@@ -82,17 +118,23 @@ export async function resolveStation(query) {
   const coords = text.match(COORDS)
   if (coords) {
     const [lat, lng] = [Number(coords[1]), Number(coords[2])]
-    const near = await nearestStationName(lat, lng)
-    return { lat, lng, name: near ? `Near ${near}` : 'Saved location', token: `${lat},${lng}` }
+    const near = load(nearKey(lat, lng))
+    return { lat, lng, name: near ? nearLabel(near) : null, token: `${lat},${lng}` }
   }
 
-  if (/^de:\d+:\d+$/i.test(text)) {
-    const s = await getJson(`/stations/${text.toLowerCase()}`)
-    return { id: s.globalId, name: s.name, token: s.globalId }
+  if (STATION_ID.test(text)) {
+    const id = text.toLowerCase()
+    return { id, name: load(stationKey(id))?.name ?? null, token: id }
   }
 
-  const s = await lookup(text)
-  return { id: s.globalId, name: s.name, token: s.name }
+  const s = await byName(text)
+  return { id: s.id, name: s.name, token: s.name }
+}
+
+// The display name of a place that `resolveStation` returned without a name.
+export function placeName(place) {
+  if (place.id) return byId(place.id).then((s) => s.name)
+  return nearestStation(place.lat, place.lng).then(nearLabel, () => nearLabel(null))
 }
 
 const ms = (iso) => new Date(iso).getTime()
@@ -156,18 +198,19 @@ const dedupe = (routes) => {
   return routes.filter((r) => !seen.has(r.id) && seen.add(r.id))
 }
 
-async function fetchSegment(origin, destination, modes, from = new Date()) {
-  const first = await fetchPage(origin, destination, modes, from)
+const byDeparture = (routes) => dedupe(routes).sort((a, b) => a.departure - b.departure)
 
-  // The routes endpoint only returns a handful of results, so ask once more
-  // starting after the last one to fill the list.
-  let routes = first
-  if (first.length) {
-    const lastStart = Math.max(...first.map((r) => r.legs[0].plannedDeparture))
-    const next = await fetchPage(origin, destination, modes, new Date(lastStart + 60_000)).catch(() => [])
-    routes = [...first, ...next]
-  }
-  return dedupe(routes).sort((a, b) => a.departure - b.departure)
+// The routes endpoint only returns a handful of results, so a second page is
+// asked for starting after the last one. The first page is handed to
+// `onPartial` right away so the card does not wait for the second.
+async function fetchSegment(origin, destination, modes, from = new Date(), onPartial) {
+  const first = await fetchPage(origin, destination, modes, from)
+  if (!first.length) return []
+  onPartial?.(byDeparture(first))
+
+  const lastStart = Math.max(...first.map((r) => r.legs[0].plannedDeparture))
+  const next = await fetchPage(origin, destination, modes, new Date(lastStart + 60_000)).catch(() => [])
+  return byDeparture([...first, ...next])
 }
 
 // Time allowed for changing vehicles at a via stop.
@@ -231,10 +274,13 @@ async function fetchChained(places, legModes) {
     .sort((a, b) => a.ride.departure - b.ride.departure)
 }
 
+const byRide = (routes) => routes.sort((a, b) => a.ride.departure - b.ride.departure)
+
 // `places` (from resolveStation) is origin, optional via stops, destination; `legModes[i]` filters
-// the transport used between stop i and stop i + 1.
-export async function fetchRoutes(places, legModes) {
+// the transport used between stop i and stop i + 1. For a direct connection `onPartial` gets the
+// first page of results while the rest is still loading.
+export async function fetchRoutes(places, legModes, onPartial) {
   if (places.length > 2) return fetchChained(places, legModes)
-  const routes = await fetchSegment(places[0], places[1], legModes[0])
-  return routes.sort((a, b) => a.ride.departure - b.ride.departure)
+  const routes = await fetchSegment(places[0], places[1], legModes[0], new Date(), (first) => onPartial?.(byRide(first)))
+  return byRide(routes)
 }

@@ -1,4 +1,7 @@
+/* The theme is chosen by the inline script in index.html (?theme=, else the
+   system setting, light on the board) and set as data-theme on <html>. */
 :root {
+  color-scheme: light;
   --bg: #f1f3f4;
   --card: #ffffff;
   --text: #202124;
@@ -14,21 +17,20 @@
   font-family: Roboto, 'Google Sans', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #202124;
-    --card: #2d2e31;
-    --text: #e8eaed;
-    --muted: #bdc1c6;
-    --faint: #9aa0a6;
-    --border: #5f6368;
-    --field: #3c4043;
-    --blue: #8ab4f8;
-    --blue-soft: #394457;
-    --good: #81c995;
-    --bad: #f28b82;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  }
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #202124;
+  --card: #2d2e31;
+  --text: #e8eaed;
+  --muted: #bdc1c6;
+  --faint: #9aa0a6;
+  --border: #5f6368;
+  --field: #3c4043;
+  --blue: #8ab4f8;
+  --blue-soft: #394457;
+  --good: #81c995;
+  --bad: #f28b82;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -687,6 +689,14 @@ html.display body {
 
 .board .notice {
   padding: 0.8em 0.9em;
+}
+
+/* When the fetched time is shown on the board; its height is taken off the rows. */
+.board .updated {
+  flex: none;
+  padding: 0.3em 0.9em 0.45em;
+  font-size: calc(var(--board-font) * 0.55);
+  line-height: 1.2;
 }
 
 .board .title .via {

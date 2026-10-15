@@ -1,8 +1,12 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { MODES, fetchRoutes, resolveStation } from './api'
+import { MODES, fetchRoutes, placeName, resolveStation } from './api'
+import { load, save } from './storage'
+import { connectionKey } from './url'
 
 const REFRESH_MS = 30_000
+// Remembered departures older than this are all in the past anyway.
+const CACHE_MAX_AGE_MS = 6 * 60 * 60_000
 
 const props = defineProps({
   connection: { type: Object, required: true },
@@ -76,8 +80,9 @@ async function addStop() {
 
 const routes = ref([])
 const error = ref('')
-const loading = ref(true)
 const updatedAt = ref(null)
+// True while the card shows what a previous visit fetched, not yet refreshed.
+const stale = ref(false)
 
 // On the TV board the text size follows the card width (capped so it stays
 // readable from a distance) and as many rows are shown as fit the card height.
@@ -92,6 +97,7 @@ const MIN_BOARD_FONT = 12
 const cardEl = ref(null)
 const titleEl = ref(null)
 const titleTextEl = ref(null)
+const footerEl = ref(null)
 const board = ref({ font: 26, title: 31, rows: 3, wide: false })
 const TITLE_SCALE = 1.2
 const TITLE_PADDING_EM = 1.8 // left + right padding of .title
@@ -99,7 +105,7 @@ const TITLE_PADDING_EM = 1.8 // left + right padding of .title
 function fitBoard() {
   const card = cardEl.value
   if (!card) return
-  const space = card.clientHeight - (titleEl.value?.offsetHeight ?? 0)
+  const space = card.clientHeight - (titleEl.value?.offsetHeight ?? 0) - (footerEl.value?.offsetHeight ?? 0)
   let font = Math.min(card.clientWidth * 0.046, Math.max(26, window.innerHeight * 0.024))
   const wide = card.clientWidth / font >= WIDE_MIN_WIDTH_EM
   const rowEm = wide ? WIDE_ROW_HEIGHT_EM : ROW_HEIGHT_EM
@@ -166,41 +172,81 @@ function lineClass(leg) {
   return `line ${leg.type.toLowerCase().replace('_', '-')}`
 }
 
+// The last results are kept per connection, so a board that reloads from
+// scratch (a signage player does, every few seconds) shows a full card at
+// once and swaps in fresh departures when they arrive.
+const cacheKey = computed(() => `routes:${connectionKey(props.connection)}`)
+
+function restore() {
+  const saved = load(cacheKey.value)
+  if (!saved || Date.now() - saved.at > CACHE_MAX_AGE_MS) return
+  stations.value = saved.stations
+  routes.value = saved.routes
+  updatedAt.value = saved.at
+  stale.value = true
+}
+
+function persist() {
+  save(cacheKey.value, { at: updatedAt.value, stations: stations.value, routes: routes.value })
+}
+
 // Guards against a slow response for an old from/to overwriting a newer one.
 let request = 0
+
+// An ID or coordinates in the URL are routable at once but have no name yet;
+// it is looked up alongside the routes and dropped into the title when known.
+function fillNames(resolved, current) {
+  resolved.forEach((place, i) => {
+    if (place.name) return
+    placeName(place).then((name) => {
+      if (current !== request) return
+      stations.value[i] = { ...place, name }
+      if (updatedAt.value) persist()
+    })
+  })
+}
 
 async function refresh() {
   const current = ++request
   const legModes = props.connection.legs.map((l) => l.modes)
+  const show = (result) => {
+    routes.value = result
+    updatedAt.value = Date.now()
+    stale.value = false
+    error.value = ''
+    persist()
+  }
   try {
     const resolved = await Promise.all(stopNames.value.map(resolveStation))
     if (current !== request) return
     stations.value = resolved
-    const result = await fetchRoutes(resolved, legModes)
+    fillNames(resolved, current)
+    const result = await fetchRoutes(resolved, legModes, (first) => current === request && show(first))
     if (current !== request) return
-    routes.value = result
-    updatedAt.value = Date.now()
-    error.value = ''
+    show(result)
   } catch (e) {
     if (current !== request) return
+    // Whatever the card showed stays; the footer says the refresh failed.
     error.value = e.message || 'Could not load connections'
-  } finally {
-    if (current === request) loading.value = false
   }
 }
 
 watch(
-  () => JSON.stringify(props.connection),
+  () => connectionKey(props.connection),
   () => {
     stations.value = []
     routes.value = []
-    loading.value = true
+    updatedAt.value = null
+    stale.value = false
+    error.value = ''
+    restore()
     refresh()
   },
 )
 
 let timer, resizeObserver
 onMounted(() => {
+  restore()
   refresh()
   timer = setInterval(refresh, REFRESH_MS)
   if (props.display) {
@@ -208,6 +254,7 @@ onMounted(() => {
     resizeObserver.observe(cardEl.value)
     resizeObserver.observe(titleEl.value) // its height follows the font size
     resizeObserver.observe(titleTextEl.value) // its width follows the stop names
+    resizeObserver.observe(footerEl.value)
     fitBoard()
   }
 })
@@ -306,8 +353,8 @@ onUnmounted(() => {
     </div>
 
     <template v-if="display || open">
-      <p v-if="error" class="notice bad">{{ error }}</p>
-      <p v-else-if="loading" class="notice">Loading connections…</p>
+      <p v-if="error && !upcoming.length" class="notice bad">{{ error }}</p>
+      <p v-else-if="!upcoming.length && (stale || !updatedAt)" class="notice">Loading departures…</p>
       <p v-else-if="!upcoming.length" class="notice">No connections found right now.</p>
 
       <ul v-if="upcoming.length" class="routes">
@@ -341,7 +388,13 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <p v-if="updatedAt && !display" class="updated">Updated {{ formatTime(updatedAt) }}</p>
+      <!-- On the board the line is always there (blank at first) so the rows never shift. -->
+      <p v-if="display || updatedAt" ref="footerEl" class="updated" :title="error">
+        <template v-if="updatedAt">
+          Updated {{ formatTime(updatedAt) }}<template v-if="error"> · could not refresh</template>
+        </template>
+        <template v-else>&nbsp;</template>
+      </p>
     </template>
   </section>
 </template>

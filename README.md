@@ -14,7 +14,7 @@ Connections are read from repeated `c` parameters. Stops are separated by `~`, a
 ?c=<from>~bus@<via>~ubahn@<via>~sbahn@<to>   fixed route through via stops
 ```
 
-- Stops are station names (`Alte Heide`), MVG global IDs (`de:09162:530`), `here`, or coordinates (`48.18372,11.59668`).
+- Stops are station names (`Alte Heide`), MVG global IDs (`de:09162:530`), `here`, or coordinates (`48.18372,11.59668`). An ID skips the name lookup, so the departures start loading at once; a name is looked up once and its ID remembered on the device.
 - Modes: `bus`, `ubahn`, `tram`, `sbahn`, `bahn`. They are optional on every leg.
 - Repeat `c` for several connections on one page.
 - The older form `?c=<from>~<to>~bus` still works.
@@ -37,11 +37,17 @@ Via stops are optional. Without them MVG picks the route. With them, each leg is
 
 Without parameters the page shows buses from Gertrud-Grunow-Straße to Alte Heide. Reversing, removing, filtering or adding a connection on the page rewrites the URL, so bookmark it to keep your setup.
 
+### Colours
+
+The page follows the system's light or dark setting. Add `&theme=light` or `&theme=dark` to choose instead. The TV board is light unless told otherwise, because TV boxes tend to report dark mode.
+
 ## TV display mode
 
 Add `&display=1` to the URL, or use the **Copy display link** button, to get a read-only board: the stop inputs, filters and add form are hidden, and each connection shows as many upcoming departures as fit the screen (more on larger resolutions, up to eight) in large text, without scrolling. Remove `display=1` to edit again.
 
 By default the board decides how many connections go side by side. Add `&cols=1` or `&cols=2` (or pick it under **Connections per row on the TV** before copying the link) to force one or two per row. With one per row, each departure is laid out on a single line across the full width.
+
+The board is made for signage players that reload the page every few seconds. The frame (header, clock, one card per connection with its stops) is drawn before any data arrives, and each card remembers its last departures on the device, so a reload shows the previous board at once and swaps in fresh data as it comes; the time it was fetched is shown under each card. When a refresh fails or times out the previous departures stay, marked "could not refresh". Nothing on the board depends on Google Fonts or on the device's location.
 
 ## Run
 

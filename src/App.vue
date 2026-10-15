@@ -95,9 +95,9 @@ async function add() {
   }
 }
 
+// The `display` class on <html> is set by the inline script in index.html, before the first paint.
 let ticker
 onMounted(() => {
-  document.documentElement.classList.toggle('display', display)
   ticker = setInterval(() => (now.value = Date.now()), 5_000)
 })
 onUnmounted(() => clearInterval(ticker))
